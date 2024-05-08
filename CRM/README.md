@@ -34,7 +34,7 @@ pip install -e .
 pip install -r requirements.txt
 ``` 
 
-All in all before doing inference you must download somewhere the weights of stable diffusion model, and place them in the repository, here i downloaded the "v2-1_768-ema-pruned.ckpt" at [this link](https://huggingface.co/stabilityai/stable-diffusion-2-1/blob/main/v2-1_768-ema-pruned.ckpt). 
+All in all before doing inference you must download somewhere the weights of stable diffusion model, and place them in the repository SD/checkpoints, here i downloaded the "v2-1_768-ema-pruned.ckpt" at [this link](https://huggingface.co/stabilityai/stable-diffusion-2-1/blob/main/v2-1_768-ema-pruned.ckpt). 
 
 thus you can try the gradio interface by executing 
 ```

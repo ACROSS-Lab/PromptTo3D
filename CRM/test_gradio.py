@@ -388,8 +388,12 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
     stage1_model_config = stage1_config.models
     stage2_model_config = stage2_config.models
 
-    xyz_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="ccm-diffusion.pth")
-    pixel_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="pixel-diffusion.pth")
+    xyz_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="ccm-diffusion.pth")#, local_dir = '~/PromptTo3D/CRM/models/')
+    pixel_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="pixel-diffusion.pth")#, local_dir = '~/PromptTo3D/CRM/models/')
+    print('############################################################################################')
+    print(xyz_path)
+    print(pixel_path)
+    
     stage1_model_config.resume = pixel_path
     stage2_model_config.resume = xyz_path
 
