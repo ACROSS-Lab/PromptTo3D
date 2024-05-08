@@ -1,0 +1,57 @@
+{
+  "Input": {
+    "img_num": 16, --> 8CCM et 8 images classiques (en fn du nb de vues)
+    "class": "all",
+    "camera_angle_num": 8, --> 8 vues
+    "tet_grid_size": 80, --> espace 3D = grille de 80*80*80
+    "validate_num": 16, ---> nombres de vues prises en validation + permet de tester la qualité pendant l'entraînement
+    "scale": 0.95,
+    "radius": 3,
+    "resolution": [256, 256] --> resolution des images données en entrée du modèle
+  },
+
+  "Pretrain": {
+    "mode": null, --> section désactivée ?? Permet un pré-entraînement ??
+    "sdf_threshold": 0.1, --> Signed distance functiun (distance à la surface d'un asset 3D), loss ???
+    "sdf_scale": 10,
+    "batch_infer": false,
+    "lr": 1e-4,
+    "radius": 0.5
+  },
+
+  "Train": {
+    "mode": "rnd", --> random training
+    "num_epochs": 500,
+    "grad_acc": 1, --> gradienst are accumulated on one step before updating weights
+    "warm_up": 0,
+    "decay": 0.000,
+    "learning_rate": {
+      "init": 1e-4,
+      "sdf_decay": 1, --> pas le même decay pour la partie sdf et rgb ????
+      "rgb_decay": 1
+    },
+    "batch_size": 4, --> trained on 4 images
+    "eva_iter": 80, --> evalué toutes les 80 épochs ???
+    "eva_all_epoch": 10, ->> colle pas avec arg d'avant .., à voir en pratique
+    "tex_sup_mode": "blender",
+    "exp_uv_mesh": false, --> voir les images en mode UV / IR, (profondeur sans couleur)
+    "doub": false, --> double precision learning desactivée
+    "random_bg": false, --> background fixe
+    "shift": 0, --> pas de random shifting
+    "aug_shift": 0, --> pas data augmentation
+    "geo_type": "flex" --> flexible shapes ???
+  },
+
+  "ArchSpecs": {
+    "unet_type": "diffusers",
+    "use_3D_aware": false,
+    "fea_concat": false,
+    "mlp_bias": true
+  },
+
+  "DecoderSpecs": {
+    "c_dim": 32, --> 32 chanel
+    "plane_resolution": 256 ---> 256*256 pixels
+  }
+}
+
