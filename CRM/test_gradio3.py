@@ -196,8 +196,9 @@ def stable_diffusion_t2i(prompt, outdir = "output_test/",
             prompts = list(prompts)
 
         with torch.no_grad(), additional_context:
+            prompts =  [prompt]
             for _ in range(3):
-                c = model.get_learned_conditioning(prompts²)
+                c = model.get_learned_conditioning(prompts)
             samples_ddim, _ = sampler.sample(S=5,
                                              conditioning=c,
                                              batch_size=1,
@@ -217,6 +218,7 @@ def stable_diffusion_t2i(prompt, outdir = "output_test/",
     with torch.no_grad(), \
         precision_scope(device), \
         model.ema_scope():
+            prompts =  [prompt]
             all_samples = list()
             uc = None
             if scale != 1.0:
@@ -403,11 +405,11 @@ PRE_PROMPT = "i want to create a 3D asset from this prompt by first generating a
 POST_PROMPT = "standing from far and isolated with lighting everywhere no sun"
 #PRE_PROMPT = "I want to create a 3D asset from this prompt by first generating an image, create"
 #POST_PROMPT = "full, whole and complete, standing from very far and isolated with lighting everywhere, and a solid background please"
-def prompt_to_image2(prompt):
+def prompt_to_image(prompt):
     prompt = prompt + POST_PROMPT
     img = stable_diffusion_t2i(prompt = prompt)
     glb_path = CRM_own(img)
-    return img, glb_path
+    return glb_path
 
 
 with gr.Blocks() as demo:
@@ -419,7 +421,7 @@ with gr.Blocks() as demo:
 
         with gr.Column():
             output_obj = gr.Model3D(interactive = False, label = "Output 3D asset")
-    generate_image_btn.click(fn = prompt_to_image2, inputs = [prompt], outputs = [output_obj])
+    generate_image_btn.click(fn = prompt_to_image, inputs = [prompt], outputs = [output_obj])
     examples = gr.Examples(examples=["a horse", "a hamburger", "a rabbit", "a man with a blue jacket"], inputs=[prompt])
 
 
