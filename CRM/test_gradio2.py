@@ -426,8 +426,10 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
 
 #################### Gradio Part #############################################
 import gradio as gr
-PRE_PROMPT = "i want to create a 3D asset from this prompt by first generating an image, create a "
-POST_PROMPT = "standing from far and isolated with lighting everywhere no sun"
+PRE_PROMPT = ""
+POST_PROMPT = ""
+#PRE_PROMPT = "i want to create a 3D asset from this prompt by first generating an image, create a "
+#POST_PROMPT = "standing from far and isolated with lighting everywhere no sun"
 def prompt_to_image(prompt):
     if prompt is None:
         raise gr.Error("Veuillez rentrer un prompt svp")

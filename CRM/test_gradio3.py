@@ -73,11 +73,11 @@ def put_watermark(img, wm_encoder=None):
     return img
 
 
-def stable_diffusion_t2i(prompt, outdir = "outputs/txt2img-samples", 
+def stable_diffusion_t2i(prompt, outdir = "output_test/", 
                          steps = 50, config = "../SD/configs/stable-diffusion/v2-inference-v.yaml",
                          ckpt = "../SD/checkpoints/v2-1_768-ema-pruned.ckpt", ddim_eta = 0.0,
-                         n_iter = 1, H = 768, W = 768, device = "cuda", 
-                         C = 4, f=8, n_samples = 1, n_rows = 0, scale = 9.0,
+                         H = 768, W = 768, device = "cuda", 
+                         C = 4, f=8, scale = 9.0,
                          seed = 42, precision = "autocast", repeat = 1, 
                         torchscript = False, ipex = False, bf16 = False, 
                         plm = False, dpm = False, fixed_code = False):
@@ -88,14 +88,11 @@ def stable_diffusion_t2i(prompt, outdir = "outputs/txt2img-samples",
     @param steps: int, number of ddim sampling steps, à augmenter ???
     @param ckpt: str, heckpoint du model
     @param ddim_eta: float, eta=0.0 corresponds to deterministic sampling
-    @param n_iter: (sample this often ??) -> mettre 3 pour avoir plus d'image
     @param H: float, hauteur de l'image générée
     @param W: float, Largeur de l'image
     @param device: str, device (cpu ou gpu)
     @param C: int, nombre de latent chanels
     @param f: int, downsampling factor (8 ou 16)
-    @param n_samples: int, batchsize
-    @param n_rows: int, lignes dans la grilles d'images
     @param scale: float, unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))
     @param seed: int, caractère aléatoire, 42 = reproductible
     @param precision: str, evaluate at this precision, full ou autocast
@@ -132,22 +129,14 @@ def stable_diffusion_t2i(prompt, outdir = "outputs/txt2img-samples",
     wm_encoder = WatermarkEncoder()
     wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
 
-    batch_size = n_samples
-    n_rows = n_rows if n_rows > 0 else batch_size
+    n_rows = 1
     #dino delete ???
     prompt = prompt
     assert prompt is not None
-    data = [batch_size * [prompt]]
-
-    sample_path = os.path.join(outpath, "samples")
-    os.makedirs(sample_path, exist_ok=True)
-    sample_count = 0
-    base_count = len(os.listdir(sample_path))
-    grid_count = len(os.listdir(outpath)) - 1
 
     start_code = None
     if fixed_code:
-        start_code = torch.randn([n_samples, C, H // f, W // f], device=device)
+        start_code = torch.randn([1, C, H // f, W // f], device=device)
 
     if torchscript or ipex:
         transformer = model.cond_stage_model.model
@@ -198,20 +187,21 @@ def stable_diffusion_t2i(prompt, outdir = "outputs/txt2img-samples",
                 print(type(scripted_decoder))
                 model.first_stage_model.decoder = scripted_decoder
 
-        prompts = data[0]
+        prompts =  [prompt]
         print("Running a forward pass to initialize optimizations")
         uc = None
         if scale != 1.0:
-            uc = model.get_learned_conditioning(batch_size * [""])
+            uc = model.get_learned_conditioning(1 * [""])
         if isinstance(prompts, tuple):
             prompts = list(prompts)
 
         with torch.no_grad(), additional_context:
+            prompts =  [prompt]
             for _ in range(3):
                 c = model.get_learned_conditioning(prompts)
             samples_ddim, _ = sampler.sample(S=5,
                                              conditioning=c,
-                                             batch_size=batch_size,
+                                             batch_size=1,
                                              shape=shape,
                                              verbose=False,
                                              unconditional_guidance_scale=scale,
@@ -223,58 +213,40 @@ def stable_diffusion_t2i(prompt, outdir = "outputs/txt2img-samples",
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
 
     precision_scope = autocast if precision=="autocast" or bf16 else nullcontext
-    #### SOLUTIOn SEULEMENT TEMPORAIRE
+    #### SOLUTION SEULEMENT TEMPORAIRE
     device = "cuda"
     with torch.no_grad(), \
         precision_scope(device), \
         model.ema_scope():
+            prompts =  [prompt]
             all_samples = list()
-            for n in trange(n_iter, desc="Sampling"):
-                for prompts in tqdm(data, desc="data"):
-                    uc = None
-                    if scale != 1.0:
-                        uc = model.get_learned_conditioning(batch_size * [""])
-                    if isinstance(prompts, tuple):
-                        prompts = list(prompts)
-                    c = model.get_learned_conditioning(prompts)
-                    shape = [C, H // f, W // f]
-                    samples, _ = sampler.sample(S=steps,
-                                                     conditioning=c,
-                                                     batch_size=n_samples,
-                                                     shape=shape,
-                                                     verbose=False,
-                                                     unconditional_guidance_scale=scale,
-                                                     unconditional_conditioning=uc,
-                                                     eta=ddim_eta,
-                                                     x_T=start_code)
+            uc = None
+            if scale != 1.0:
+                uc = model.get_learned_conditioning(1 * [""])
+            if isinstance(prompts, tuple):
+                prompts = list(prompts)
+            c = model.get_learned_conditioning(prompts)
+            shape = [C, H // f, W // f]
+            samples, _ = sampler.sample(S=steps,
+                                                conditioning=c,
+                                                batch_size=1,
+                                                shape=shape,
+                                                verbose=False,
+                                                unconditional_guidance_scale=scale,
+                                                unconditional_conditioning=uc,
+                                                eta=ddim_eta,
+                                                x_T=start_code)
 
-                    x_samples = model.decode_first_stage(samples)
-                    x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
+            x_samples = model.decode_first_stage(samples)
+            x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
 
-                    for x_sample in x_samples:
-                        x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
-                        img = Image.fromarray(x_sample.astype(np.uint8))
-                        img = put_watermark(img, wm_encoder)
-                        img.save(os.path.join(sample_path, f"{base_count:05}.png"))
-                        base_count += 1
-                        sample_count += 1
+            x_sample = x_samples[0]
+            x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
+            img = Image.fromarray(x_sample.astype(np.uint8))
+            img = put_watermark(img, wm_encoder)
+            #img.save(os.path.join(outdir, "mon_image.png"))
+    return img
 
-                    all_samples.append(x_samples)
-
-            # additionally, save as grid
-            grid = torch.stack(all_samples, 0)
-            grid = rearrange(grid, 'n b c h w -> (n b) c h w')
-            grid = make_grid(grid, nrow=n_rows)
-
-            # to image
-            grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
-            grid = Image.fromarray(grid.astype(np.uint8))
-            grid = put_watermark(grid, wm_encoder)
-            grid.save(os.path.join(outpath, f'grid-{grid_count:04}.png'))
-            grid_count += 1
-
-    print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
-          f" \nEnjoy.")
     
     
 
@@ -358,7 +330,6 @@ def preprocess_image(image, background_choice, foreground_ratio, backgroud_color
     image = add_background(image, backgroud_color)
     return image.convert("RGB")
 
-## implémenter la possiblilité d'avoir plusieurs images !!!!
 
 
 
@@ -366,11 +337,9 @@ def preprocess_image(image, background_choice, foreground_ratio, backgroud_color
 
 
 
-def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "out/" ):
+def CRM_own(img,  scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "out/" ):
 
    # bg_choice : "[Auto Remove background] or [Alpha as mask]",
-
-    img = Image.open(inputdir)
     img = preprocess_image(img, bg_choice, 1.0, (127, 127, 127))
     os.makedirs(outdir, exist_ok=True)
     img.save(outdir+"preprocessed_image.png")
@@ -437,32 +406,10 @@ POST_PROMPT = "standing from far and isolated with lighting everywhere no sun"
 #PRE_PROMPT = "I want to create a 3D asset from this prompt by first generating an image, create"
 #POST_PROMPT = "full, whole and complete, standing from very far and isolated with lighting everywhere, and a solid background please"
 def prompt_to_image(prompt):
-    if prompt is None:
-        raise gr.Error("Veuillez rentrer un prompt svp")
-    prompt = PRE_PROMPT + prompt + POST_PROMPT
-    stable_diffusion_t2i(prompt = prompt)
-    #do resize content ? expand to square ?
-    out_path = "outputs/txt2img-samples/samples"
-    grid_count = len(os.listdir(out_path)) - 1
-    out_path = out_path + f"/{grid_count:05}.png"
-    img = Image.open(out_path)
-    return img
-
-def prompt_to_image2(prompt):
-    if prompt is None:
-        raise gr.Error("Veuillez rentrer un prompt svp")
     prompt = prompt + POST_PROMPT
-    stable_diffusion_t2i(prompt = prompt)
-    #do resize content ? expand to square ?
-    out_path = "outputs/txt2img-samples/samples"
-    grid_count = len(os.listdir(out_path)) - 1
-    out_path = out_path + f"/{grid_count:05}.png"
-    img = Image.open(out_path)
-
-    glb_path = CRM_own(out_path)
-
-
-    return img, glb_path
+    img = stable_diffusion_t2i(prompt = prompt)
+    glb_path = CRM_own(img)
+    return glb_path
 
 
 with gr.Blocks() as demo:
@@ -473,10 +420,8 @@ with gr.Blocks() as demo:
 
 
         with gr.Column():
-            image_generee = gr.Image(label = "image 2D", image_mode = 'RGBA', sources = 'upload', type = 'pil', interactive = False)
-    with gr.Row():
-        output_obj = gr.Model3D(interactive = False, label = "Output 3D asset")
-    generate_image_btn.click(fn = prompt_to_image2, inputs = [prompt], outputs = [image_generee, output_obj])
+            output_obj = gr.Model3D(interactive = False, label = "Output 3D asset")
+    generate_image_btn.click(fn = prompt_to_image, inputs = [prompt], outputs = [output_obj])
     examples = gr.Examples(examples=["a horse", "a hamburger", "a rabbit", "a man with a blue jacket"], inputs=[prompt])
 
 
