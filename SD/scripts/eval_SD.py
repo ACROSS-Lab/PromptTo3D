@@ -41,24 +41,10 @@ class ImageRater:
         self.window = tk.Tk()
         self.window.title("Stable Diffusion evaluation")
 
-
-
-
         out_dir_label = tk.Label(self.window, text="Images and prompts repository")
         out_dir_label.pack()
-        self.out_dir_entry = tk.Entry(self.window)
-        self.out_dir_entry.pack()
-
-
-
-
-        select_dir_button = tk.Button(self.window, text='Select this repository', command = self.get_out_dir)
+        select_dir_button = tk.Button(self.window, text='Select your repository', command = self.get_out_dir)
         select_dir_button.pack()
-
-
-
-
-   
 
 
 
@@ -174,10 +160,17 @@ class ImageRater:
         Saves the score for the current image-prompt pair and displays the next one (if available).
         """
         score = self.score_entry.get()
-        # Implement logic to save score and image/prompt data to CSV (e.g., using csv library)
-        # ...
 
 
+        # Save score to CSV
+        image_name = os.path.basename(self.images[self.current_index].filename)  # Get image filename
+        with open(self.out_dir+"/scores.csv", "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([image_name, score, self.prompts[self.current_index]])  # Save image name, score, and prompt
+
+
+        # Clear score entry for next image
+        self.score_entry.delete(0, tk.END)
 
 
         self.current_index += 1
@@ -186,6 +179,8 @@ class ImageRater:
         else:
             self.show_completion_message()
             self.quit_button.config(text="Close", command=self.quit_app)
+
+
 
 
 
@@ -213,5 +208,6 @@ class ImageRater:
 # Run the main loop
 if __name__ == "__main__":
     rater = ImageRater()
-    #rater.init_window()
     tk.mainloop()
+
+
