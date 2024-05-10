@@ -157,4 +157,5 @@ out/
 outputs/
 v2-1_768-ema-pruned.ckpt
 CRM/models/
+SD/images_tests/
 
