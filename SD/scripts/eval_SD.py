@@ -20,6 +20,9 @@ class ImageRater:
         self.photo_image_temp=None
         self.prompt_temp=None
         self.init_window()
+        self.score_1_var = None
+        self.score_2_var = None
+        self.score_3_var = None
 
 
 
@@ -40,11 +43,12 @@ class ImageRater:
         """
         self.window = tk.Tk()
         self.window.title("Stable Diffusion evaluation")
-
         out_dir_label = tk.Label(self.window, text="Images and prompts repository")
         out_dir_label.pack()
+
         select_dir_button = tk.Button(self.window, text='Select your repository', command = self.get_out_dir)
         select_dir_button.pack()
+
 
 
 
@@ -66,27 +70,13 @@ class ImageRater:
             with open(files, 'r') as f:
                 self.prompts = f.readlines()
 
-
-
-
         for i in range (len(self.prompts)-1):
             self.prompts[i]=self.prompts[i][:-2]
-
-
-
 
         if len(self.images) != len(self.prompts):
             raise ValueError(f"Error, There must be as many prompts as images, here we found {len(self.images)} images and {len(self.prompts)} prompts...")
         self.create_rating_window()
         self.show_image_and_prompt()
-
-
-
-
-
-
-       
-
 
 
 
@@ -97,28 +87,37 @@ class ImageRater:
         self.rating_window = Tk()
         self.rating_window.title("Rate Image")
 
+        score_1_frame = tk.Frame(self.rating_window)
+        score_1_label = tk.Label(score_1_frame, text="% de l'objet présent")
+        score_1_label.pack(side="left")
+        self.score_1_var = tk.IntVar()
+        score_1_button1 = tk.Radiobutton(score_1_frame, text="0-25%", variable=self.score_1_var, value=1)
+        score_1_button2 = tk.Radiobutton(score_1_frame, text="25-50%", variable=self.score_1_var, value=2)
+        score_1_button3 = tk.Radiobutton(score_1_frame, text="50-75%", variable=self.score_1_var, value=3)
+        score_1_button4 = tk.Radiobutton(score_1_frame, text="75-100%", variable=self.score_1_var, value=4)
+        score_1_button1.pack(side="left")
+        score_1_button2.pack(side="left")
+        score_1_button3.pack(side="left")
+        score_1_button4.pack(side="left")
+        score_1_frame.pack()
 
 
+        # Score 2: Checkbox (Yes/No)
+        score_2_frame = tk.Frame(self.rating_window)
+        score_2_label = tk.Label(score_2_frame, text="L'objet est-il isolé ? (cocher si oui)")
+        score_2_label.pack(side="left")
+        self.score_2_var = tk.BooleanVar()
+        score_2_checkbox = tk.Checkbutton(score_2_frame, text="", variable=self.score_2_var)
+        score_2_checkbox.pack(side="left")
+        score_2_frame.pack()
 
 
-
-
-
-
-
-        # Display prompt
-        self.prompt_label = tk.Label(self.rating_window)
-        self.prompt_label.pack()
-
-
-
-
-        # Entry for score
-        self.score_entry = tk.Entry(self.rating_window)
-        self.score_entry.pack()
-
-
-
+        # Score 3: Slider
+        score_3_label = tk.Label(self.rating_window, text="correspondance prompt-image, 0 = rien à voir à 10 = parfait:")
+        score_3_label.pack()
+        self.score_3_var = tk.IntVar()
+        score_3_slider = tk.Scale(self.rating_window, from_=0, to=10, orient=tk.HORIZONTAL, variable=self.score_3_var)
+        score_3_slider.pack()
 
         # Button to save score and go to next image
         self.save_and_next_button = tk.Button(self.rating_window, text="Save & Next", command=self.save_and_next)
@@ -131,14 +130,15 @@ class ImageRater:
         self.quit_button = tk.Button(self.rating_window, text="Quit", command=self.quit_app)
         self.quit_button.pack()
 
-
+        # Display prompt
+        self.prompt_label = tk.Label(self.rating_window)
+        self.prompt_label.pack()
         # Display image
         self.image_label = tk.Label(self.rating_window)
         self.image_label.pack(fill="both", expand = True)
 
 
         self.show_image_and_prompt()
-
 
 
 
@@ -159,18 +159,16 @@ class ImageRater:
         """
         Saves the score for the current image-prompt pair and displays the next one (if available).
         """
-        score = self.score_entry.get()
+        score1 = self.score_1_var.get()
+        score2 = self.score_2_var.get()
+        score3 = self.score_3_var.get()
 
 
         # Save score to CSV
         image_name = os.path.basename(self.images[self.current_index].filename)  # Get image filename
         with open(self.out_dir+"/scores.csv", "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow([image_name, score, self.prompts[self.current_index]])  # Save image name, score, and prompt
-
-
-        # Clear score entry for next image
-        self.score_entry.delete(0, tk.END)
+            writer.writerow([image_name, score1, score2, score3, self.prompts[self.current_index]])  # Save image name, score, and prompt
 
 
         self.current_index += 1
@@ -181,7 +179,9 @@ class ImageRater:
             self.quit_button.config(text="Close", command=self.quit_app)
 
 
-
+        self.score_1_var.set(0)
+        self.score_2_var.set(False)
+        self.score_3_var.set(0)
 
 
 
@@ -208,6 +208,9 @@ class ImageRater:
 # Run the main loop
 if __name__ == "__main__":
     rater = ImageRater()
+    #rater.init_window()
     tk.mainloop()
+
+
 
 
