@@ -244,7 +244,9 @@ def main(opt):
         print(f"reading prompts from {opt.from_file}")
         with open(opt.from_file, "r") as f:
             data = f.read().splitlines()
-            data = [p for p in data for i in range(opt.repeat)]
+            PRE_PROMPT = ""
+            POST_PROMPT = "3D"
+            data = [PRE_PROMPT + p + POST_PROMPT for p in data for i in range(opt.repeat)]
             data = list(chunk(data, batch_size))
 
     sample_path = os.path.join(outpath, "samples")
