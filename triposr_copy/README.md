@@ -5,7 +5,9 @@
 - Move to SD folder : 
 ```commandline
 cd SD
-```
+
+
+And Then :
 
 
 
