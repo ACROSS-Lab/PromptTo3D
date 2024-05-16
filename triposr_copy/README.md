@@ -5,7 +5,7 @@
 - Move to SD folder : 
 ```commandline
 cd SD
-
+```
 
 And Then :
 
@@ -37,9 +37,9 @@ conda install -c conda-forge gxx_linux-64==9.5.0
 ```
 
 Then, run the following. It will take up to 30 min reinsttalling some dependencies 
-'''commandline
+```commandline
 pip install xformers==0.0.16
-'''
+```
 Upon successful installation, the code will automatically default to [memory efficient attention](https://github.com/facebookresearch/xformers)
 for the self- and cross-attention layers in the U-Net and autoencoder.
 
