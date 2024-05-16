@@ -3,7 +3,7 @@
 ### Installation
 
 - Move to SD folder : 
-'''commandline
+```commandline
 cd SD
 
 
@@ -46,7 +46,7 @@ and put it into PromptTo3D/SD/checkpoints folder.
 ### OTHER INSTALATIONS
 - Moov to TRIPOSR_COPY
 
-'''commandline
+```commandline
 cd ../triposr_copy
 
 
