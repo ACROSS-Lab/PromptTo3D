@@ -5,6 +5,7 @@
 - Move to SD folder : 
 ```commandline
 cd SD
+```
 
 
 
@@ -48,6 +49,7 @@ and put it into PromptTo3D/SD/checkpoints folder.
 
 ```commandline
 cd ../triposr_copy
+```
 
 
 and 
