@@ -43,8 +43,8 @@ pip install xformers==0.0.16
 Upon successful installation, the code will automatically default to [memory efficient attention](https://github.com/facebookresearch/xformers)
 for the self- and cross-attention layers in the U-Net and autoencoder.
 
-First, download the weights for [_SD2.1-v_](https://huggingface.co/stabilityai/stable-diffusion-2-1) and [_SD2.1-base_](https://huggingface.co/stabilityai/stable-diffusion-2-1-base). 
-and put it into PromptTo3D/SD/checkpoints folder.
+First, download the weights for [_SD2.1-v_](https://huggingface.co/stabilityai/stable-diffusion-2-1) and [_SD2.1-base_](https://huggingface.co/stabilityai/stable-diffusion-2-1-base) and put them into the `PromptTo3D/SD/checkpoints` folder.
+
 
 ### OTHER INSTALATIONS
 - Moov to TRIPOSR_COPY
