@@ -17,7 +17,6 @@ kornia==0.6
 invisible-watermark==0.2.0
 streamlit-drawable-canvas==0.9.3
 ninja==1.11.1.1
-nvdiffrast==0.3.1
 diffusers==0.24.0
 huggingface-hub==0.22.2
 Pillow==10.1.0
