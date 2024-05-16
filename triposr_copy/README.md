@@ -11,10 +11,10 @@ And Then :
 
 
 
-'''
+```
 conda env create -f environment.yaml
 conda activate ldm
-'''
+```
 You can update the created environement with 
 
 ```
