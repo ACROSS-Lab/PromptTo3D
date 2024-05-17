@@ -36,12 +36,7 @@ conda install -c conda-forge gcc
 conda install -c conda-forge gxx_linux-64==9.5.0
 ```
 
-Then, run the following. It will take up to 30 min reinsttalling some dependencies 
-```commandline
-pip install xformers==0.0.16
-```
-Upon successful installation, the code will automatically default to [memory efficient attention](https://github.com/facebookresearch/xformers)
-for the self- and cross-attention layers in the U-Net and autoencoder.
+
 
 First, download the weights for [_SD2.1-v_](https://huggingface.co/stabilityai/stable-diffusion-2-1) and [_SD2.1-base_](https://huggingface.co/stabilityai/stable-diffusion-2-1-base) and put them into the `PromptTo3D/SD/checkpoints` folder.
 
@@ -57,6 +52,13 @@ cd ../triposr_copy
 and 
 
 - Install other dependencies by `pip install -r requirements.txt`
+
+Then, run the following. It will take up to 30 min reinsttalling some dependencies 
+```commandline
+pip install xformers==0.0.16
+```
+Upon successful installation, the code will automatically default to [memory efficient attention](https://github.com/facebookresearch/xformers)
+for the self- and cross-attention layers in the U-Net and autoencoder.
 
 ### Manual Inference 
 ```sh
