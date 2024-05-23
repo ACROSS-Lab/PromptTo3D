@@ -158,3 +158,6 @@ outputs/
 v2-1_768-ema-pruned.ckpt
 CRM/models/
 SD/images_tests/
+CRM/3D_benchmark
+triposr_copy/3D_benchmark
+output/
