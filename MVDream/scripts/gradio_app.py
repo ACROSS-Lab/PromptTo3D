@@ -61,7 +61,7 @@ def generate_images(args, model, sampler, text_input, uncond_text_input, seed, g
     uc = model.get_learned_conditioning( [uncond_text_input] ).to(device)
     set_seed(seed)
     images = []
-    for _ in range(2):
+    for _ in range(args.n_assets):
         img = t2i(model, args.size, t, uc, sampler, step=step, scale=guidance_scale, batch_size=batch_size, ddim_eta=0.0, 
                 dtype=dtype, device=device, camera=camera, num_frames=num_frames)
         img = np.concatenate(img, 1)
@@ -78,10 +78,11 @@ if __name__ == "__main__":
     parser.add_argument("--config_path", type=str, default=None, help="load model from local config (override model_name)")
     parser.add_argument("--ckpt_path", type=str, default=None, help="path to local checkpoint")
     parser.add_argument("--suffix", type=str, default=", 3d asset")
-    parser.add_argument("--num_frames", type=int, default=4)
+    parser.add_argument("--num_frames", type=int, default=2)
     parser.add_argument("--size", type=int, default=256)
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--device", type=str, default='cuda')
+    parser.add_argument("--n_assets", type = int, default = 1, help="nombre de multivus générées")
     args = parser.parse_args()
 
     print("load t2i model ... ")

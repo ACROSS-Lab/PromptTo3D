@@ -223,7 +223,7 @@ def stable_diffusion_t2i(prompt, outdir = "outputs/txt2img-samples",
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
 
     precision_scope = autocast if precision=="autocast" or bf16 else nullcontext
-    #### SOLUTIOn SEULEMENT TEMPORAIRE
+    #### SOLUTION SEULEMENT TEMPORAIRE
     device = "cuda"
     with torch.no_grad(), \
         precision_scope(device), \
@@ -376,12 +376,16 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
     img.save(outdir+"preprocessed_image.png")
 
     crm_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="CRM.pth")
-    specs = json.load(open("configs/specs_objaverse_total.json"))
+    #specs = json.load(open("configs/specs_objaverse_total.json"))
+    specs = json.load(open("configs/23D.json"))
     model = CRM(specs).to("cuda")
     model.load_state_dict(torch.load(crm_path, map_location = "cuda"), strict=False)
 
-    stage1_config = OmegaConf.load("configs/nf7_v3_SNR_rd_size_stroke.yaml").config
-    stage2_config = OmegaConf.load("configs/stage2-v2-snr.yaml").config
+    #stage1_config = OmegaConf.load("configs/nf7_v3_SNR_rd_size_stroke.yaml").config
+    #stage2_config = OmegaConf.load("configs/stage2-v2-snr.yaml").config
+    stage1_config = OmegaConf.load("configs/i2is.yaml").config
+    stage2_config = OmegaConf.load("configs/is2ccm.yaml").config
+    
     stage2_sampler_config = stage2_config.sampler
     stage1_sampler_config = stage1_config.sampler
 
@@ -430,7 +434,7 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
 #################### Gradio Part #############################################
 import gradio as gr
 PRE_PROMPT = ""
-POST_PROMPT = "3D"
+POST_PROMPT = ", 3D"
 
 #PRE_PROMPT = "i want to create a 3D asset from this prompt by first generating an image, create a "
 #POST_PROMPT = "standing from far and isolated with lighting everywhere no sun"

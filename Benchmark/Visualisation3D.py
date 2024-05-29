@@ -1,6 +1,4 @@
-#from trimesh import viewer
 import trimesh
-#from trimesh.viewer import windowed
 import pyautogui
 from vedo import load, Mesh
 import vedo
@@ -8,12 +6,19 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import Tk, filedialog
 import matplotlib.pyplot as plt
-#from trimesh.viewer import TrimeshScene
 from os import path, getcwd
 from glob import glob
 import csv
-#from vedo import deleteAll  # Import deleteAll function
-
+import pyglet
+"""
+Ce script permet de visualiser les objets 3D générés par triposr et CRM, il faut que dans un dossier, vous ayez
+tous vos objets rangés comme ceci :
+./objet1, ./objet2, .... ./objetn (peu importe le noom du dossier ./objeti, il peut être renommé à votre guise il faut seulement que chaque asset 3D soit situé dans un dossier séparé)
+ensuite chque dossier doit être organisé de la sorte, et contenir les 4 fichiers suivant nommés exactement de la sorte
+* model1.obj : l'objet généré par le triposr
+* model2.obj : la mesh de l'objet généré par le CRM
+* model2.png : la couleur de l'objet généré par le CRM
+"""
 class ImageRater:
   def __init__(self):
         self.out_dir = None
@@ -154,9 +159,7 @@ class ImageRater:
       """
       pos = (0, int(self.screen_height - self.quarter_height))  # Top-left corner at (0, remaining height)
       size = (self.quarter_width*3, self.quarter_height*3)
-      if self.current_index>0 :
-         mesh.show(pos = pos, size=size, interactive = False).close()
-      vedo_window = mesh.show(pos = pos, size=size, interactive = False)  # Link vedo window to Tkinter window
+      vedo_window = mesh.show(pos = pos, size=size).close()
       vedo_window.close_on_empty_queue = True  # Close vedo window when Tkinter closes
 
 
@@ -167,15 +170,7 @@ class ImageRater:
       self.prompt_label.config(text=self.prompts[self.current_index])
       trimesh_mesh1, vedo_mesh2 = self.meshes[self.current_index]
       self.show_vedo_mesh(vedo_mesh2)
-      #self.show_trimesh_mesh(trimesh_mesh1)
-      window = pyglet.window.Window(width=self.quarter_width * 3, height=self.quarter_height * 3)
-      scene = trimesh.Scene([trimesh_mesh1])
-      @window.event
-      def on_draw():
-          window.clear()
-          scene.render()
-
-      window.run()
+      self.show_trimesh_mesh(trimesh_mesh1)
 
 if __name__ == "__main__":
     rater = ImageRater()
