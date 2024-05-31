@@ -1,7 +1,10 @@
 import trimesh
 import numpy as np
-
-
+import requests
+from PIL import Image
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from glob import glob
+from os import path
 def cube():
     """
     Fonction qui output les rotations d'objet nécessaires pour obtenir les points de vue 
@@ -53,10 +56,10 @@ def icosahedron():
         viewpoints.append(trimesh.transformations.rotation_matrix(angle=angle, direction=direction))
     return viewpoints
 
-def screenshot_the_mesh(mesh, prompt, method = icosahedron):
+def screenshot_the_mesh(mesh, prompt, out_folder ='./imagesout_01/', method = icosahedron):
     ##### Tout d'abord la partie Screenshot  ########
     resolution=(512, 384)
-    filename_format="view_{:03d}.png"
+    filename_format="{:03d}.png"
     scene = mesh.scene()
     #On considère l'icosahedre
     viewpoints = method()
@@ -75,7 +78,23 @@ def screenshot_the_mesh(mesh, prompt, method = icosahedron):
             print(f"vue n {i} enregistrée")
         except ZeroDivisionError:
             print("Error: Window resizing caused division by zero. Try setting minimum window size or handling resizing events.")
-
-
+    return out_folder
 
 screenshot_the_mesh(mesh, prompt)
+
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+
+
+def prompts_the_views(processor, model, out_dir):
+    Prompts = []
+    for img in glob.glob(path.relpath(out_dir+'/*.png')):
+        raw_image = Image.open(img).convert('RGB')
+        inputs = processor(raw_image, return_tensors="pt")
+        out = model.generate(**inputs)
+        Prompts.append(processor.decode(out[0], skip_special_tokens=True))
+    return Prompts
+
+
+def compare_two_prompts():
+    pass
