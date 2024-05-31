@@ -79,9 +79,27 @@ python test_gradio_triposr.py
 
 
 
+### For Quick 3D asset generation with MVDream and TripoSR
 
+- Move to MVDream folder :
+```commandline
+cd ../MVDream
+```
 
+And then 
+```
+pip install -e . --no-deps
+```
 
+-Now change Directory 
+```commandline
+cd ../triposr_copy
+```
+### Local Gradio App with MVDream
+
+```sh
+python MVDream_text_3D_gradio_app.py
+```
 
 
 ### Acknowledgement
