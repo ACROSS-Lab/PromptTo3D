@@ -4,7 +4,13 @@ import requests
 from PIL import Image
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from glob import glob
-from os import path
+from os import path, getcwd
+from sentence_transformers import SentenceTransformer, util
+from tqdm import tqdm
+import argparse
+import cv2
+
+
 def cube():
     """
     Fonction qui output les rotations d'objet nécessaires pour obtenir les points de vue 
@@ -20,9 +26,6 @@ def cube():
         trimesh.transformations.rotation_matrix(angle=-np.pi/2, direction=[1, 0, 0]),
     ]
     return viewpoints
-
-mesh = trimesh.load("model1.obj")
-prompt = ""
 
 def icosahedron():
     """
@@ -42,7 +45,6 @@ def icosahedron():
                 [0, phi, 1], [0, phi, -1], [0, -phi, -1], [0, -phi, 1]]
     vertices = [np.array(e) for e in vertices]
     #vertices provided in the forum https://math.stackexchange.com/questions/2174594/co-ordinates-of-the-vertices-an-icosahedron-relative-to-its-centroid
-
     X = np.array([1,0,0]) #point de vue initial
     O = np.array([0,0,0]) #centre de la mesh
     viewpoints = []
@@ -56,13 +58,16 @@ def icosahedron():
         viewpoints.append(trimesh.transformations.rotation_matrix(angle=angle, direction=direction))
     return viewpoints
 
-def screenshot_the_mesh(mesh, prompt, out_folder ='./imagesout_01/', method = icosahedron):
+
+###CODE THE PART OUT_FOLDER, J4AI EU LA FLEMME....
+def screenshot_the_mesh(mesh, out_folder ='./imagesout_01/', method = icosahedron, save_views = False):
     ##### Tout d'abord la partie Screenshot  ########
     resolution=(512, 384)
     filename_format="{:03d}.png"
     scene = mesh.scene()
     #On considère l'icosahedre
     viewpoints = method()
+    screenshots = [] #generator ????
     for i, viewpoint in enumerate(viewpoints):
         # bouger la camera
         camera_old, _ = scene.graph[scene.camera.name]
@@ -71,30 +76,100 @@ def screenshot_the_mesh(mesh, prompt, out_folder ='./imagesout_01/', method = ic
         filename = filename_format.format(i)
         try :
             png = scene.save_image(resolution=resolution, visible=True)
-            with open(filename, "wb") as f:
-                f.write(png)
+            img_arr = cv2.imdecode(np.fromstring(png, np.uint8), cv2.IMREAD_COLOR)
+            rgb_img = cv2.cvtColor(img_arr, cv2.COLOR_BGR2RGB) 
+            screenshots.append(rgb_img)
+            if save_views :
+                with open(filename, "wb") as f:
+                    f.write(png)
             # repartir de la vue initiale..
             scene.graph[scene.camera.name] = camera_old
-            print(f"vue n {i} enregistrée")
         except ZeroDivisionError:
             print("Error: Window resizing caused division by zero. Try setting minimum window size or handling resizing events.")
-    return out_folder
+    return screenshots
 
-screenshot_the_mesh(mesh, prompt)
-
-processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
-
-
-def prompts_the_views(processor, model, out_dir):
+def prompts_the_views(processor, model, screenshots):
     Prompts = []
-    for img in glob.glob(path.relpath(out_dir+'/*.png')):
-        raw_image = Image.open(img).convert('RGB')
+    #for img in glob(path.relpath(out_dir+'/*.png')):
+        #raw_image = Image.open(img).convert('RGB')
+    for raw_image in screenshots:
         inputs = processor(raw_image, return_tensors="pt")
         out = model.generate(**inputs)
         Prompts.append(processor.decode(out[0], skip_special_tokens=True))
     return Prompts
 
 
-def compare_two_prompts():
-    pass
+query = "a dog eating a slice of watermelon"
+docs = ["dog eats watermelon", "a dog sleeping", "a couch whith a watermelon on it", "a motorcycle", "a corgi devouring a piece of melon", "a pitt-bull eating a fruit"]
+
+def compare_two_prompts(prompt, prompts, model_comparation, show_scores = False):
+    prompt_embedded = model_comparation.encode(prompt)
+    prompts_embedded = model_comparation.encode(prompts)
+    scores = util.dot_score(prompt_embedded, prompts_embedded)[0].cpu().tolist()
+    if show_scores :
+        doc_score_pairs = list(zip(docs, scores))
+        doc_score_pairs = sorted(doc_score_pairs, key=lambda x: x[1], reverse=True)
+        for doc, score in doc_score_pairs:
+            print(score, doc)
+    mean_scores = sum(scores)/len(scores)
+    return mean_scores
+
+def main(method, folder, name, save_views):
+    ##Load the models that will be used
+    #First the image to prompt model 
+    processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+    model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+    #load the model that will compare the prompts
+    model_comparation = SentenceTransformer('sentence-transformers/msmarco-distilbert-cos-v5')
+
+    #loop on each asset
+    for n_prompt,folder in enumerate(tqdm(sorted(glob(path.join(folder, '[0-9]*/'))))):
+        cwd = getcwd()
+        folder_name = path.relpath(folder, cwd)
+
+        #manipulationen fonction du nom de la mesh
+        if name:
+            asset_path = path.join(folder_name, name +'.obj')
+            if not path.isfile(asset_path):
+                raise FileNotFoundError(f"Le dossier '{folder_name}' est incomplet, il devrait contenir : '{name}.obj'")
+        else:
+            asset_path = glob(path.join(folder, "*.obj"))
+            if len(asset_path!=1):
+                raise FileNotFoundError(f"Le dossier '{folder_name}' contient plus d'un fichier .obj, il ne doit en contenir qu'un seul exactement")
+        mesh = trimesh.load(asset_path)
+        screenshots = screenshot_the_mesh(mesh = mesh, method = method, save_views = save_views)
+        prompts = prompts_the_views(processor = processor, model = model, screenshots = screenshots)
+        ##FLEMME : to do : récupérer le prompt en question, sauvegarder le score et mettre tout ça dans un csv, et output le moyenne de note...
+
+
+
+
+if __name__== "__main__" :
+    parser = argparse.ArgumentParser(description = 'Evaluer les performances de mes assets 3D')
+    parser.add_argument(
+        "--method",
+        help = "vues prises, que ce soit celles d'un icosahedron (12 sommets) ou d'un cube (6 faces)...",
+        default = icosahedron
+    )
+    parser.add_argument(
+        "--folder",
+        help = "fichier dans lequel sont situees les mesh de nos objets 3D",
+        default = '.',
+        type = str
+    )
+    parser.add_argument(
+        "--name",
+        help = "nom des fichiers .obj",
+        default = None,
+        type = str
+    )
+    parser.add_argument(
+        "--save_views",
+        default = False,
+        type = bool,
+        help = "booléen qui décide si oui ou non on sauvegarde les vues de notre modèle"
+
+
+    )
+    args = parser.parse_args()
+    main(*vars(args))
