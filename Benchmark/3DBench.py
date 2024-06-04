@@ -9,6 +9,7 @@ from sentence_transformers import SentenceTransformer, util
 from tqdm import tqdm
 import argparse
 import cv2
+import csv
 
 
 def cube():
@@ -58,8 +59,6 @@ def icosahedron():
         viewpoints.append(trimesh.transformations.rotation_matrix(angle=angle, direction=direction))
     return viewpoints
 
-
-###CODE THE PART OUT_FOLDER, J4AI EU LA FLEMME....
 def screenshot_the_mesh(mesh, out_folder ='./imagesout_01/', method = icosahedron, save_views = False):
     ##### Tout d'abord la partie Screenshot  ########
     resolution=(512, 384)
@@ -80,7 +79,7 @@ def screenshot_the_mesh(mesh, out_folder ='./imagesout_01/', method = icosahedro
             rgb_img = cv2.cvtColor(img_arr, cv2.COLOR_BGR2RGB) 
             screenshots.append(rgb_img)
             if save_views :
-                with open(filename, "wb") as f:
+                with open(path.join(out_folder,filename), "wb") as f:
                     f.write(png)
             # repartir de la vue initiale..
             scene.graph[scene.camera.name] = camera_old
@@ -111,20 +110,24 @@ def compare_two_prompts(prompt, prompts, model_comparation, show_scores = False)
         doc_score_pairs = sorted(doc_score_pairs, key=lambda x: x[1], reverse=True)
         for doc, score in doc_score_pairs:
             print(score, doc)
-    mean_scores = sum(scores)/len(scores)
-    return mean_scores
+    mean_score = sum(scores)/len(scores)
+    return mean_score
 
-def main(method, folder, name, save_views):
+def main(method, folder_mother, name, save_views):
     ##Load the models that will be used
     #First the image to prompt model 
     processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
     model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
     #load the model that will compare the prompts
     model_comparation = SentenceTransformer('sentence-transformers/msmarco-distilbert-cos-v5')
-
+    cwd = getcwd()
+    with open(path.join(folder_mother, '*.txt'), 'r') as f:
+        prompts = [line.strip()[:] for line in f.readlines()]
     #loop on each asset
-    for n_prompt,folder in enumerate(tqdm(sorted(glob(path.join(folder, '[0-9]*/'))))):
-        cwd = getcwd()
+    scores = []
+    for n_prompt,folder in enumerate(tqdm(sorted(glob(path.join(folder_mother, '[0-9]*/'))))):
+        
+
         folder_name = path.relpath(folder, cwd)
 
         #manipulationen fonction du nom de la mesh
@@ -132,14 +135,25 @@ def main(method, folder, name, save_views):
             asset_path = path.join(folder_name, name +'.obj')
             if not path.isfile(asset_path):
                 raise FileNotFoundError(f"Le dossier '{folder_name}' est incomplet, il devrait contenir : '{name}.obj'")
+            name_csv = '/' + name + '_scores.csv'
+            out_message = f',pour le model {name}'
         else:
             asset_path = glob(path.join(folder, "*.obj"))
             if len(asset_path!=1):
                 raise FileNotFoundError(f"Le dossier '{folder_name}' contient plus d'un fichier .obj, il ne doit en contenir qu'un seul exactement")
+            name_csv = '/scores.csv'
+            out_message = ''
         mesh = trimesh.load(asset_path)
         screenshots = screenshot_the_mesh(mesh = mesh, method = method, save_views = save_views)
-        prompts = prompts_the_views(processor = processor, model = model, screenshots = screenshots)
-        ##FLEMME : to do : récupérer le prompt en question, sauvegarder le score et mettre tout ça dans un csv, et output le moyenne de note...
+        prompts_created = prompts_the_views(processor = processor, model = model, screenshots = screenshots)
+        prompt_main = prompts[n_prompt]
+        score = compare_two_prompts(prompt_main,prompts_created, model_comparation)
+        scores.append(score)
+        with open(folder_mother + name_csv, "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([n_prompt, score, prompts[n_prompt] ])
+    out_message = f"le score moyen que nous venons de calculer est de {np.mean(scores)}" + out_message
+    print(out_message)
 
 
 
@@ -152,7 +166,7 @@ if __name__== "__main__" :
         default = icosahedron
     )
     parser.add_argument(
-        "--folder",
+        "--folder_mother",
         help = "fichier dans lequel sont situees les mesh de nos objets 3D",
         default = '.',
         type = str
