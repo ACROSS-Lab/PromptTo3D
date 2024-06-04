@@ -101,13 +101,13 @@ def prompts_the_views(processor, model, screenshots):
 query = "a dog eating a slice of watermelon"
 docs = ["dog eats watermelon", "a dog sleeping", "a couch whith a watermelon on it", "a motorcycle", "a corgi devouring a piece of melon", "a pitt-bull eating a fruit"]
 
-def compare_two_prompts(prompt, prompts, model_comparation, show_scores = False):
+def compare_two_prompts(prompt, prompts, model_comparation, show_scores = True):
     prompt_embedded = model_comparation.encode(prompt)
     prompts_embedded = model_comparation.encode(prompts)
     scores = util.dot_score(prompt_embedded, prompts_embedded)[0].cpu().tolist()
     if show_scores :
-        doc_score_pairs = list(zip(docs, scores))
-        doc_score_pairs = sorted(doc_score_pairs, key=lambda x: x[1], reverse=True)
+        doc_score_pairs = list(zip(prompts, scores))
+        #doc_score_pairs = sorted(doc_score_pairs, key=lambda x: x[1], reverse=True)
         for doc, score in doc_score_pairs:
             print(score, doc)
     mean_score = sum(scores)/len(scores)
@@ -121,7 +121,8 @@ def main(method, folder_mother, name, save_views):
     #load the model that will compare the prompts
     model_comparation = SentenceTransformer('sentence-transformers/msmarco-distilbert-cos-v5')
     cwd = getcwd()
-    with open(path.join(folder_mother, '*.txt'), 'r') as f:
+    folder_mother = path.relpath(folder_mother, cwd)
+    with open(path.join(folder_mother, 'prompts.txt'), 'r') as f:
         prompts = [line.strip()[:] for line in f.readlines()]
     #loop on each asset
     scores = []
@@ -136,7 +137,7 @@ def main(method, folder_mother, name, save_views):
             if not path.isfile(asset_path):
                 raise FileNotFoundError(f"Le dossier '{folder_name}' est incomplet, il devrait contenir : '{name}.obj'")
             name_csv = '/' + name + '_scores.csv'
-            out_message = f',pour le model {name}'
+            out_message = f', pour le model {name}'
         else:
             asset_path = glob(path.join(folder, "*.obj"))
             if len(asset_path!=1):
@@ -144,7 +145,7 @@ def main(method, folder_mother, name, save_views):
             name_csv = '/scores.csv'
             out_message = ''
         mesh = trimesh.load(asset_path)
-        screenshots = screenshot_the_mesh(mesh = mesh, method = method, save_views = save_views)
+        screenshots = screenshot_the_mesh(mesh = mesh, out_folder = folder, method = method, save_views = save_views)
         prompts_created = prompts_the_views(processor = processor, model = model, screenshots = screenshots)
         prompt_main = prompts[n_prompt]
         score = compare_two_prompts(prompt_main,prompts_created, model_comparation)
@@ -155,7 +156,7 @@ def main(method, folder_mother, name, save_views):
     out_message = f"le score moyen que nous venons de calculer est de {np.mean(scores)}" + out_message
     print(out_message)
 
-
+list_to_delete = ["with a white background", "on a white background"]
 
 
 if __name__== "__main__" :
@@ -168,7 +169,7 @@ if __name__== "__main__" :
     parser.add_argument(
         "--folder_mother",
         help = "fichier dans lequel sont situees les mesh de nos objets 3D",
-        default = '.',
+        default = './',
         type = str
     )
     parser.add_argument(
@@ -186,4 +187,4 @@ if __name__== "__main__" :
 
     )
     args = parser.parse_args()
-    main(*vars(args))
+    main(**vars(args))
