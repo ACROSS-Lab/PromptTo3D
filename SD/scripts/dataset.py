@@ -129,23 +129,27 @@ class ImageRater:
         #le try permet d'éviter les problèmes d'url non foctionnels
         try :
             image_PIL = Image.open(requests.get(self.image, stream=True).raw)
+            # Resize image while maintaining aspect ratio
+            image_width, image_height = image_PIL.size
+            if image_width > self.max_width or image_height > self.max_height:
+                # Calculate resize ratio
+                scale_ratio = min(self.max_width / image_width, self.max_height / image_height)
+                new_width = int(image_width * scale_ratio)
+                new_height = int(image_height * scale_ratio)
+                image_PIL = image_PIL.resize((new_width, new_height), resample=Image.Resampling.LANCZOS)  # Resize with antialiasing
+            self.photo_image_temp = ImageTk.PhotoImage(image_PIL)
+            self.image_label.config(image=self.photo_image_temp)
+            self.name_label.config(text="Name= " + self.name)
+            self.description_label.config(text="Description = " + self.description)
+            self.index_label.config(text="Indice : " + str(self.current_index + self.start_index))
         except  Exception as e:
             # Handle cases where the request fails or the image format is unsupported
-            print(f"Error processing image {url}: {e}")
-            self.show_url_error_message()
-        # Resize image while maintaining aspect ratio
-        image_width, image_height = image_PIL.size
-        if image_width > self.max_width or image_height > self.max_height:
-            # Calculate resize ratio
-            scale_ratio = min(self.max_width / image_width, self.max_height / image_height)
-            new_width = int(image_width * scale_ratio)
-            new_height = int(image_height * scale_ratio)
-            image_PIL = image_PIL.resize((new_width, new_height), resample=Image.Resampling.LANCZOS)  # Resize with antialiasing
-        self.photo_image_temp = ImageTk.PhotoImage(image_PIL)
-        self.image_label.config(image=self.photo_image_temp)
-        self.name_label.config(text="Name= " + self.name)
-        self.description_label.config(text="Description = " + self.description)
-        self.index_label.config(text="Indice : " + str(self.current_index + self.start_index))
+            print(f"Error processing image url : {e}")
+            #self.show_url_error_message()
+            self.score_1_var.set(0)
+            self.current_index += 1
+            self.show_image_and_prompt()
+
 
     def save_and_next(self):
         """
@@ -203,6 +207,6 @@ if __name__== "__main__" :
     parser.add_argument(
         "--start_index",
         help = "Indice de départ de l'évaluation",
-        default = 0)
+        default = 2436)
     args = parser.parse_args()
     main(**vars(args))
