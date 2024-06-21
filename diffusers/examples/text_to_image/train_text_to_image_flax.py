@@ -249,9 +249,7 @@ def parse_args():
     return args
 
 
-dataset_name_mapping = {
-    "lambdalabs/naruto-blip-captions": ("image", "text"),
-}
+
 
 
 def get_params_to_save(params):
@@ -259,6 +257,7 @@ def get_params_to_save(params):
 
 
 def main():
+    
     args = parse_args()
 
     if args.report_to == "wandb" and args.hub_token is not None:
@@ -292,50 +291,16 @@ def main():
                 repo_id=args.hub_model_id or Path(args.output_dir).name, exist_ok=True, token=args.hub_token
             ).repo_id
 
-    # Get the datasets: you can either provide your own training and evaluation files (see below)
-    # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
+    dataset = load_dataset("imagefolder", data_dir="./folder/", drop_labels=True)
 
-    # In distributed training, the load_dataset function guarantees that only one local process can concurrently
-    # download the dataset.
-    if args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        dataset = load_dataset(
-            args.dataset_name, args.dataset_config_name, cache_dir=args.cache_dir, data_dir=args.train_data_dir
-        )
-    else:
-        data_files = {}
-        if args.train_data_dir is not None:
-            data_files["train"] = os.path.join(args.train_data_dir, "**")
-        dataset = load_dataset(
-            "imagefolder",
-            data_files=data_files,
-            cache_dir=args.cache_dir,
-        )
-        # See more about loading custom images at
-        # https://huggingface.co/docs/datasets/v2.4.0/en/image_load#imagefolder
-
+    # download the dataset.      
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.
-    column_names = dataset["train"].column_names
-
-    # 6. Get the column names for input/target.
-    dataset_columns = dataset_name_mapping.get(args.dataset_name, None)
-    if args.image_column is None:
-        image_column = dataset_columns[0] if dataset_columns is not None else column_names[0]
-    else:
-        image_column = args.image_column
-        if image_column not in column_names:
-            raise ValueError(
-                f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}"
-            )
-    if args.caption_column is None:
-        caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
-    else:
-        caption_column = args.caption_column
-        if caption_column not in column_names:
-            raise ValueError(
-                f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}"
-            )
+    column_names = dataset["train"].column_names #['image', 'label, 'text'], but label is useless
+    image_column = column_names[0]
+    caption_column = column_names[-1]
+    images = dataset["train"][image_column]
+    prompts = dataset["train"][caption_column]
 
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.

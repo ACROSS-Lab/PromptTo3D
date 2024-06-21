@@ -42,6 +42,16 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 from transformers.utils import ContextManagers
 
+from omegaconf import OmegaConf
+from pytorch_lightning import seed_everything
+import xformers
+import xformers.ops
+from ldm.util import instantiate_from_config
+from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.plms import PLMSSampler
+from ldm.models.diffusion.dpm_solver import DPMSolverSampler
+
+
 import diffusers
 from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
@@ -61,10 +71,6 @@ check_min_version("0.30.0.dev0")
 
 logger = get_logger(__name__, log_level="INFO")
 
-DATASET_NAME_MAPPING = {
-    "lambdalabs/naruto-blip-captions": ("image", "text"),
-}
-
 
 def save_model_card(
     args,
@@ -72,6 +78,7 @@ def save_model_card(
     images: list = None,
     repo_folder: str = None,
 ):
+#sera utile seulement si l'on souhaite "push to hub", à ne pas faire forcément ...
     img_str = ""
     if len(images) > 0:
         image_grid = make_image_grid(images, 1, len(args.validation_prompts))
@@ -110,6 +117,8 @@ These are the key hyperparameters used during training:
 * Mixed-precision: {args.mixed_precision}
 
 """
+
+    #Weinght&Biases, permet de visualiser les poids, partie non nécessaire #####
     wandb_info = ""
     if is_wandb_available():
         wandb_run_url = None
@@ -120,9 +129,11 @@ These are the key hyperparameters used during training:
         wandb_info = f"""
 More information on all the CLI arguments and the environment are available on your [`wandb` run page]({wandb_run_url}).
 """
-
     model_description += wandb_info
+    ###########################################################################
 
+    #MODEL CARD : me semble pas forcément être utile...
+    
     model_card = load_or_create_model_card(
         repo_id_or_path=repo_id,
         from_training=True,
@@ -136,7 +147,7 @@ More information on all the CLI arguments and the environment are available on y
     model_card = populate_model_card(model_card, tags=tags)
 
     model_card.save(os.path.join(repo_folder, "README.md"))
-
+    
 
 def log_validation(vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch):
     logger.info("Running validation... ")
@@ -200,16 +211,16 @@ def log_validation(vae, text_encoder, tokenizer, unet, args, accelerator, weight
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
     parser.add_argument(
-        "--input_perturbation", type=float, default=0, help="The scale of input perturbation. Recommended 0.1."
+        "--input_perturbation", type=float, default=0.1, help="The scale of input perturbation. Recommended 0.1." #for data augmentation, can try 0 too (without noise)
     )
-    parser.add_argument(
+    parser.add_argument( #i already have the download script from a .ckpt file; will do that i guess, to have the other hyperparameters..
         "--pretrained_model_name_or_path",
         type=str,
-        default=None,
+        default="stabilityai/stable-diffusion-2-1",
         required=True,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
-    parser.add_argument(
+    parser.add_argument( #optional !! (specific version of pretrained model)
         "--revision",
         type=str,
         default=None,
@@ -217,47 +228,12 @@ def parse_args():
         help="Revision of pretrained model identifier from huggingface.co/models.",
     )
     parser.add_argument(
-        "--variant",
+        "--variant", #precision of the weights
         type=str,
-        default=None,
+        default="fp16",
         help="Variant of the model files of the pretrained model identifier from huggingface.co/models, 'e.g.' fp16",
     )
-    parser.add_argument(
-        "--dataset_name",
-        type=str,
-        default=None,
-        help=(
-            "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
-            " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
-            " or to a folder containing files that 🤗 Datasets can understand."
-        ),
-    )
-    parser.add_argument(
-        "--dataset_config_name",
-        type=str,
-        default=None,
-        help="The config of the Dataset, leave as None if there's only one config.",
-    )
-    parser.add_argument(
-        "--train_data_dir",
-        type=str,
-        default=None,
-        help=(
-            "A folder containing the training data. Folder contents must follow the structure described in"
-            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
-        ),
-    )
-    parser.add_argument(
-        "--image_column", type=str, default="image", help="The column of the dataset containing an image."
-    )
-    parser.add_argument(
-        "--caption_column",
-        type=str,
-        default="text",
-        help="The column of the dataset containing a caption or a list of captions.",
-    )
-    parser.add_argument(
+    parser.add_argument( #speaks for itself...
         "--max_train_samples",
         type=int,
         default=None,
@@ -267,7 +243,7 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--validation_prompts",
+        "--validation_prompts", #set of validation prompts --> check there must be a image-to-prompt distance
         type=str,
         default=None,
         nargs="+",
@@ -295,7 +271,7 @@ def parse_args():
             " resolution"
         ),
     )
-    parser.add_argument(
+    parser.add_argument( # crop a part of the asset --> will set it to False (for 3D asset)!
         "--center_crop",
         default=False,
         action="store_true",
@@ -326,14 +302,14 @@ def parse_args():
         help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     parser.add_argument(
-        "--gradient_checkpointing",
+        "--gradient_checkpointing", 
         action="store_true",
         help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
     )
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=1e-4,
+        default=1e-5,
         help="Initial learning rate (after the potential warmup period) to use.",
     )
     parser.add_argument(
@@ -355,14 +331,14 @@ def parse_args():
         "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
     )
     parser.add_argument(
-        "--snr_gamma",
+        "--snr_gamma", #signal to noise ratio --> permet de converger plus vite, on débruite plus et accorde moins d'importance à la partie respect du prompt
         type=float,
         default=None,
         help="SNR weighting gamma to be used if rebalancing the loss. Recommended value is 5.0. "
         "More details here: https://arxiv.org/abs/2303.09556.",
     )
     parser.add_argument(
-        "--dream_training",
+        "--dream_training", #denoising from noisy image... Il apprend la force de denoising nécessaire en quelques sortes...
         action="store_true",
         help=(
             "Use the DREAM training method, which makes training more efficient and accurate at the ",
@@ -436,7 +412,7 @@ def parse_args():
     parser.add_argument(
         "--mixed_precision",
         type=str,
-        default=None,
+        default="fp16",
         choices=["no", "fp16", "bf16"],
         help=(
             "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
@@ -503,9 +479,6 @@ def parse_args():
     if env_local_rank != -1 and env_local_rank != args.local_rank:
         args.local_rank = env_local_rank
 
-    # Sanity checks
-    if args.dataset_name is None and args.train_data_dir is None:
-        raise ValueError("Need either a dataset name or a training folder.")
 
     # default to using the same revision for the non-ema model if not specified
     if args.non_ema_revision is None:
@@ -523,15 +496,7 @@ def main():
             " Please use `huggingface-cli login` to authenticate with the Hub."
         )
 
-    if args.non_ema_revision is not None:
-        deprecate(
-            "non_ema_revision!=None",
-            "0.15.0",
-            message=(
-                "Downloading 'non_ema' weights from revision branches of the Hub is deprecated. Please make sure to"
-                " use `--variant=non_ema` instead."
-            ),
-        )
+    
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
 
     accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
@@ -544,6 +509,7 @@ def main():
     )
 
     # Disable AMP for MPS.
+    #c'est que pour les macs, en soit ça nous servira pas ...
     if torch.backends.mps.is_available():
         accelerator.native_amp = False
 
@@ -610,9 +576,17 @@ def main():
             args.pretrained_model_name_or_path, subfolder="vae", revision=args.revision, variant=args.variant
         )
 
-    unet = UNet2DConditionModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="unet", revision=args.non_ema_revision
-    )
+    config = "../SD/configs/stable-diffusion/v2-inference-v.yaml"
+    config = OmegaConf.load(f"{config}")
+    device = torch.device("cpu")
+    ckpt = './checkpoints/v2-1_768-ema-pruned.ckpt'
+    pl_sd = torch.load(ckpt, map_location="cpu")
+    model = instantiate_from_config(config.model)
+    model.cuda()
+    device = torch.device(“cuda”)
+    sampler = DDIMSampler(model, device=device)
+    unet = model.model.diffusion_model
+
 
     # Freeze vae and text_encoder and set unet to trainable
     vae.requires_grad_(False)
@@ -713,49 +687,14 @@ def main():
 
     # In distributed training, the load_dataset function guarantees that only one local process can concurrently
     # download the dataset.
-    if args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        dataset = load_dataset(
-            args.dataset_name,
-            args.dataset_config_name,
-            cache_dir=args.cache_dir,
-            data_dir=args.train_data_dir,
-        )
-    else:
-        data_files = {}
-        if args.train_data_dir is not None:
-            data_files["train"] = os.path.join(args.train_data_dir, "**")
-        dataset = load_dataset(
-            "imagefolder",
-            data_files=data_files,
-            cache_dir=args.cache_dir,
-        )
-        # See more about loading custom images at
-        # https://huggingface.co/docs/datasets/v2.4.0/en/image_load#imagefolder
-
+    # download the dataset.      
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.
-    column_names = dataset["train"].column_names
-
-    # 6. Get the column names for input/target.
-    dataset_columns = DATASET_NAME_MAPPING.get(args.dataset_name, None)
-    if args.image_column is None:
-        image_column = dataset_columns[0] if dataset_columns is not None else column_names[0]
-    else:
-        image_column = args.image_column
-        if image_column not in column_names:
-            raise ValueError(
-                f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}"
-            )
-    if args.caption_column is None:
-        caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
-    else:
-        caption_column = args.caption_column
-        if caption_column not in column_names:
-            raise ValueError(
-                f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}"
-            )
-
+    column_names = dataset["train"].column_names #['image', 'text'], but label is useless
+    image_column = column_names[0]
+    caption_column = column_names[-1]
+    images = dataset["train"][image_column]
+    prompts = dataset["train"][caption_column]
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
     def tokenize_captions(examples, is_train=True):
