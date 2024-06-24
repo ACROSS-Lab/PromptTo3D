@@ -149,7 +149,7 @@ def parse_args():
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default=None,
+        default="stabilityai/stable-diffusion-2-1",
         required=True,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
@@ -165,22 +165,6 @@ def parse_args():
         type=str,
         default=None,
         help="Variant of the model files of the pretrained model identifier from huggingface.co/models, 'e.g.' fp16",
-    )
-    parser.add_argument(
-        "--dataset_name",
-        type=str,
-        default=None,
-        help=(
-            "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
-            " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
-            " or to a folder containing files that 🤗 Datasets can understand."
-        ),
-    )
-    parser.add_argument(
-        "--dataset_config_name",
-        type=str,
-        default=None,
-        help="The config of the Dataset, leave as None if there's only one config.",
     )
     parser.add_argument(
         "--train_data_dir",
@@ -418,6 +402,15 @@ def parse_args():
         default=4,
         help=("The dimension of the LoRA update matrices."),
     )
+    parser.add_argument(
+        "--data_path",
+        type=str,
+        default="../../../SD/train",
+        help=(
+            "chemin vers les données stockées en local pour finetuner Stable Diffusion"
+        ),
+    )
+    
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -591,25 +584,17 @@ def main():
 
     # In distributed training, the load_dataset function guarantees that only one local process can concurrently
     # download the dataset.
-    if args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        dataset = load_dataset(
-            args.dataset_name,
-            args.dataset_config_name,
-            cache_dir=args.cache_dir,
-            data_dir=args.train_data_dir,
-        )
-    else:
-        data_files = {}
-        if args.train_data_dir is not None:
-            data_files["train"] = os.path.join(args.train_data_dir, "**")
-        dataset = load_dataset(
-            "imagefolder",
-            data_files=data_files,
-            cache_dir=args.cache_dir,
-        )
-        # See more about loading custom images at
-        # https://huggingface.co/docs/datasets/v2.4.0/en/image_load#imagefolder
+    
+    config = "../../../SD/configs/stable-diffusion/v2-inference-v.yaml"
+    config = OmegaConf.load(f"{config}")
+    device = torch.device("cuda")
+    ckpt = '../../../SD/checkpoints/v2-1_768-ema-pruned.ckpt'
+    pl_sd = torch.load(ckpt, map_location="cuda")
+    model = instantiate_from_config(config.model)
+    model.cuda()
+    device = torch.device("cuda")
+    sampler = DDIMSampler(model, device=device)
+    unet = model.model.diffusion_model
 
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.

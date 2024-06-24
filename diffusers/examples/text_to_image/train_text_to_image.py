@@ -61,7 +61,7 @@ from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 
-
+torch.cuda.empty_cache()
 if is_wandb_available():
     import wandb
 
@@ -88,7 +88,7 @@ def save_model_card(
     model_description = f"""
 # Text-to-image finetuning - {repo_id}
 
-This pipeline was finetuned from **{args.pretrained_model_name_or_path}** on the **{args.dataset_name}** dataset. Below are some example images generated with the finetuned pipeline using the following prompts: {args.validation_prompts}: \n
+This pipeline was finetuned from **{args.pretrained_model_name}** on the a dataset. Below are some example images generated with the finetuned pipeline using the following prompts: {args.validation_prompts}: \n
 {img_str}
 
 ## Pipeline usage
@@ -138,7 +138,7 @@ More information on all the CLI arguments and the environment are available on y
         repo_id_or_path=repo_id,
         from_training=True,
         license="creativeml-openrail-m",
-        base_model=args.pretrained_model_name_or_path,
+        base_model=args.pretrained_model_name,
         model_description=model_description,
         inference=True,
     )
@@ -153,7 +153,7 @@ def log_validation(vae, text_encoder, tokenizer, unet, args, accelerator, weight
     logger.info("Running validation... ")
 
     pipeline = StableDiffusionPipeline.from_pretrained(
-        args.pretrained_model_name_or_path,
+        args.pretrained_model_name,
         vae=accelerator.unwrap_model(vae),
         text_encoder=accelerator.unwrap_model(text_encoder),
         tokenizer=tokenizer,
@@ -214,7 +214,7 @@ def parse_args():
         "--input_perturbation", type=float, default=0.1, help="The scale of input perturbation. Recommended 0.1." #for data augmentation, can try 0 too (without noise)
     )
     parser.add_argument( #i already have the download script from a .ckpt file; will do that i guess, to have the other hyperparameters..
-        "--pretrained_model_name_or_path",
+        "--pretrained_model_name",
         type=str,
         default="stabilityai/stable-diffusion-2-1",
         required=True,
@@ -370,7 +370,7 @@ def parse_args():
         required=False,
         help=(
             "Revision of pretrained non-ema model identifier. Must be a branch, tag or git identifier of the local or"
-            " remote repository specified with --pretrained_model_name_or_path."
+            " remote repository specified with --pretrained_model_name."
         ),
     )
     parser.add_argument(
@@ -473,6 +473,14 @@ def parse_args():
             " more information see https://huggingface.co/docs/accelerate/v0.17.0/en/package_reference/accelerator#accelerate.Accelerator"
         ),
     )
+    parser.add_argument(
+        "--data_path",
+        type=str,
+        default="../../../SD/train",
+        help=(
+            "chemin vers les données stockées en local pour finetuner Stable Diffusion"
+        ),
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -544,9 +552,9 @@ def main():
             ).repo_id
 
     # Load scheduler, tokenizer and models.
-    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name, subfolder="scheduler")
     tokenizer = CLIPTokenizer.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="tokenizer", revision=args.revision
+        args.pretrained_model_name, subfolder="tokenizer", revision=args.revision
     )
 
     def deepspeed_zero_init_disabled_context_manager():
@@ -570,20 +578,20 @@ def main():
     # across multiple gpus and only UNet2DConditionModel will get ZeRO sharded.
     with ContextManagers(deepspeed_zero_init_disabled_context_manager()):
         text_encoder = CLIPTextModel.from_pretrained(
-            args.pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision, variant=args.variant
+            args.pretrained_model_name, subfolder="text_encoder", revision=args.revision, variant=args.variant
         )
         vae = AutoencoderKL.from_pretrained(
-            args.pretrained_model_name_or_path, subfolder="vae", revision=args.revision, variant=args.variant
+            args.pretrained_model_name, subfolder="vae", revision=args.revision, variant=args.variant
         )
 
-    config = "../SD/configs/stable-diffusion/v2-inference-v.yaml"
+    config = "../../../SD/configs/stable-diffusion/v2-inference-v.yaml"
     config = OmegaConf.load(f"{config}")
-    device = torch.device("cpu")
-    ckpt = './checkpoints/v2-1_768-ema-pruned.ckpt'
-    pl_sd = torch.load(ckpt, map_location="cpu")
+    device = torch.device("cuda")
+    ckpt = '../../../SD/checkpoints/v2-1_768-ema-pruned.ckpt'
+    pl_sd = torch.load(ckpt, map_location="cuda")
     model = instantiate_from_config(config.model)
     model.cuda()
-    device = torch.device(“cuda”)
+    device = torch.device("cuda")
     sampler = DDIMSampler(model, device=device)
     unet = model.model.diffusion_model
 
@@ -596,7 +604,7 @@ def main():
     # Create EMA for the unet.
     if args.use_ema:
         ema_unet = UNet2DConditionModel.from_pretrained(
-            args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision, variant=args.variant
+            args.pretrained_model_name, subfolder="unet", revision=args.revision, variant=args.variant
         )
         ema_unet = EMAModel(ema_unet.parameters(), model_cls=UNet2DConditionModel, model_config=ema_unet.config)
 
@@ -686,14 +694,17 @@ def main():
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
 
     # In distributed training, the load_dataset function guarantees that only one local process can concurrently
-    # download the dataset.
-    # download the dataset.      
+    # download the dataset.     
+    
+    dataset = load_dataset("imagefolder", data_dir=args.data_path, drop_labels=False)
+
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.
-    column_names = dataset["train"].column_names #['image', 'text'], but label is useless
+    column_names = dataset["train"].column_names #['image', 'text']
     image_column = column_names[0]
     caption_column = column_names[-1]
     images = dataset["train"][image_column]
+    #images = torch.unsqueeze(torch.tensor(images), dim=0)
     prompts = dataset["train"][caption_column]
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
@@ -875,6 +886,7 @@ def main():
                 if args.input_perturbation:
                     new_noise = noise + args.input_perturbation * torch.randn_like(noise)
                 bsz = latents.shape[0]
+                print("bsz=",bsz)
                 # Sample a random timestep for each image
                 timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
                 timesteps = timesteps.long()
@@ -913,9 +925,12 @@ def main():
                         args.dream_detail_preservation,
                     )
 
-                # Predict the noise residual and compute loss
-                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
+                print("noisy_latents = ", noisy_latents.size())
+                print("target = ", target.size())
 
+                # Predict the noise residual and compute loss
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0].unsqueeze(0)
+                print("model", model_pred.size())
                 if args.snr_gamma is None:
                     loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
                 else:
@@ -943,7 +958,10 @@ def main():
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(unet.parameters(), args.max_grad_norm)
+                print("avant cata")
+                print(optimizer)
                 optimizer.step()
+                print("après cata")
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
@@ -1016,7 +1034,7 @@ def main():
             ema_unet.copy_to(unet.parameters())
 
         pipeline = StableDiffusionPipeline.from_pretrained(
-            args.pretrained_model_name_or_path,
+            args.pretrained_model_name,
             text_encoder=text_encoder,
             vae=vae,
             unet=unet,
