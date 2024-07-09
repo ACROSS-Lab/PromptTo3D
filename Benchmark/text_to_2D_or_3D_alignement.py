@@ -5,13 +5,17 @@ import open_clip
 from PIL import Image
 import cv2
 from glob import glob
-from os import path, getcwd
+from os import path
 from tqdm import tqdm
 import trimesh
 import argparse
 import platform
 import csv
 import matplotlib.pyplot as plt
+import tkinter as tk
+from PIL import Image, ImageTk
+#from tkinter import simpledialog
+
 
 # Setup and configuration for the execution environment
 os.environ['DISPLAY'] = ':1'
@@ -195,6 +199,57 @@ def visualize_results(top_prompt_counts, total_images):
     plt.show()
 
 
+# Function to display images and collect user evaluations
+def evaluate_image_alignment(images, main_prompt, csv_filename):
+    root = tk.Tk()
+    root.title("Evaluate Image and Prompt Alignment")
+
+    label = tk.Label(root)
+    label_prompt = tk.Label(root, text="", font=("Helvetica", 14))
+    label.pack()
+    label_prompt.pack()
+
+    current_image_index = [0]  # Use a list to hold the current index as a mutable object
+
+    # Function to handle user submission
+    def submit_rating(rating):
+        nonlocal current_image_index  # Refer to the outer scope variable
+        image_index = current_image_index[0]  # Get the current index
+        with open(csv_filename, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([image_index + 1, main_prompt, rating])  # Adjust index for human-readable format
+        if image_index < len(images) - 1:
+            current_image_index[0] += 1
+            display_image(current_image_index[0])
+        else:
+            root.destroy()
+
+    # Function to display each image
+    def display_image(index):
+        if isinstance(images[index], str):
+            img = Image.open(images[index])
+            img = img.convert('RGB')
+        else:
+            img = Image.fromarray(images[index])
+
+        img = img.resize((500, 300), Image.Resampling.LANCZOS)
+        photo = ImageTk.PhotoImage(img)
+        label.config(image=photo)
+        label.image = photo
+        label_prompt.config(text=f"Prompt: {main_prompt}")
+
+    # Buttons for user ratings
+    button1 = tk.Button(root, text="Not Aligned (1-3)", command=lambda: submit_rating("Not Aligned"))
+    button2 = tk.Button(root, text="Partially Aligned (4)", command=lambda: submit_rating("Partially Aligned"))
+    button3 = tk.Button(root, text="Fully Aligned (5)", command=lambda: submit_rating("Fully Aligned"))
+    button1.pack(side=tk.LEFT)
+    button2.pack(side=tk.LEFT)
+    button3.pack(side=tk.LEFT)
+
+    display_image(current_image_index[0])
+    root.mainloop()
+
+
 def main(use_screenshots, directory, prompt_path, test_prompt_path, obj_file=None, csv_filename='results.csv'):
     main_prompt, test_prompts = load_prompts(prompt_path, test_prompt_path)
     
@@ -214,6 +269,7 @@ def main(use_screenshots, directory, prompt_path, test_prompt_path, obj_file=Non
 
     top_prompt_counts = process_images(images, models, main_prompt, test_prompts, csv_filename)
     visualize_results(top_prompt_counts, len(images))
+    evaluate_image_alignment(images, main_prompt, csv_filename)
 
     print("Results:", top_prompt_counts)
 
