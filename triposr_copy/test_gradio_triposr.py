@@ -340,6 +340,7 @@ def process_image(input_image_path, output_dir, device='cuda:0', pretrained_mode
     meshes = model.extract_mesh(scene_codes, resolution=mc_resolution)
     output_mesh_path = os.path.join(output_dir, f"mesh.{model_save_format}")
     meshes[0].export(output_mesh_path)
+    print("Mesh exportation ended")
 
     return output_mesh_path
 
@@ -351,7 +352,6 @@ def process_image(input_image_path, output_dir, device='cuda:0', pretrained_mode
 
 
 
-# Definition of a fonction that handle image and 3D generation 
 def generate_image_and_convert_to_3d(prompt):
     # Generate Image from prompt via stable diffusion
     image_path = stable_diffusion_t2i(prompt, outdir="outputs/txt2img-samples")
@@ -374,29 +374,28 @@ with gr.Blocks() as demo:
 
     with gr.Row():
         with gr.Column():
-            prompt = gr.Textbox(label="Prompt", placeholder="Enter your prompt here by describying what exactely you when Eg car standing up.")
-            generate_image_btn = gr.Button("Générer 3D")
+            prompt = gr.Textbox(label="Prompt", placeholder="Enter your prompt here by describing what exactly you want, e.g., car standing up.")
+            generate_image_btn = gr.Button("Generate 3D")
         with gr.Column():
-            image_generated = gr.Image(label="Image Générée")
-            model_3d = gr.Model3D(label="Modèle 3D")
+            image_generated = gr.Image(label="Generated Image")
+            model_3d = gr.Model3D(label="3D Model")
 
-    # Fonction to execute when clic
     def update_outputs(prompt):
         image_path, model_3d_path = generate_image_and_convert_to_3d(prompt)
         if image_path and os.path.exists(image_path):
-            with open(image_path, "rb") as file:
-                img = Image.open(file)
-                img.show()
+            image = Image.open(image_path)
+        else:
+            image = None
         if model_3d_path and os.path.exists(model_3d_path):
-            return img, model_3d_path
-        return None, None
+            model_path = model_3d_path
+        else:
+            model_path = None
+        return image, model_path
 
-    # Connexion of the button to the update fonction
     generate_image_btn.click(
         fn=update_outputs,
         inputs=prompt,
         outputs=[image_generated, model_3d]
     )
 
-# Launch the interface with share option activated
 demo.launch(share=True)
