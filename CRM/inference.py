@@ -6,7 +6,8 @@ from util.utils import get_tri
 import tempfile
 from mesh import Mesh
 import zipfile
-def generate3d(model, rgb, ccm, device):
+import trimesh
+def generate3d(model, rgb, ccm, device, object_name = 'tmp/temp'):
 
     color_tri = torch.from_numpy(rgb)/255
     xyz_tri = torch.from_numpy(ccm[:,:,(2,1,0)])/255
@@ -74,8 +75,7 @@ def generate3d(model, rgb, ccm, device):
 
         mesh = Mesh.load(mesh_path_obj+".obj", bound=0.9, front_dir="+z")
         mesh_path_glb = tempfile.NamedTemporaryFile(suffix=f"", delete=False).name
-        mesh.write(mesh_path_glb+".glb")
-
+        mesh.write(object_name+".glb")
         # mesh_obj2 = trimesh.load(mesh_path_glb+".glb", file_type='glb')
         # mesh_path_obj2 = tempfile.NamedTemporaryFile(suffix=f"", delete=False).name
         # mesh_obj2.export(mesh_path_obj2+".obj")

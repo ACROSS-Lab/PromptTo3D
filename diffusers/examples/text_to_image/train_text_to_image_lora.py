@@ -42,6 +42,15 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
+from omegaconf import OmegaConf
+from pytorch_lightning import seed_everything
+import xformers
+import xformers.ops
+from ldm.util import instantiate_from_config
+from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.plms import PLMSSampler
+from ldm.models.diffusion.dpm_solver import DPMSolverSampler
+
 import diffusers
 from diffusers import AutoencoderKL, DDPMScheduler, DiffusionPipeline, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
@@ -51,6 +60,9 @@ from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 
+
+#from accelerate import AutoModelForKwargs
+#from accelerate import GradScaler
 
 if is_wandb_available():
     import wandb
@@ -147,7 +159,7 @@ def log_validation(
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
     parser.add_argument(
-        "--pretrained_model_name_or_path",
+        "--pretrained_model_name",
         type=str,
         default="stabilityai/stable-diffusion-2-1",
         required=True,
@@ -165,16 +177,6 @@ def parse_args():
         type=str,
         default=None,
         help="Variant of the model files of the pretrained model identifier from huggingface.co/models, 'e.g.' fp16",
-    )
-    parser.add_argument(
-        "--train_data_dir",
-        type=str,
-        default=None,
-        help=(
-            "A folder containing the training data. Folder contents must follow the structure described in"
-            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
-        ),
     )
     parser.add_argument(
         "--image_column", type=str, default="image", help="The column of the dataset containing an image."
@@ -417,9 +419,7 @@ def parse_args():
     if env_local_rank != -1 and env_local_rank != args.local_rank:
         args.local_rank = env_local_rank
 
-    # Sanity checks
-    if args.dataset_name is None and args.train_data_dir is None:
-        raise ValueError("Need either a dataset name or a training folder.")
+    
 
     return args
 
@@ -482,19 +482,46 @@ def main():
                 repo_id=args.hub_model_id or Path(args.output_dir).name, exist_ok=True, token=args.hub_token
             ).repo_id
     # Load scheduler, tokenizer and models.
-    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name, subfolder="scheduler")
     tokenizer = CLIPTokenizer.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="tokenizer", revision=args.revision
+        args.pretrained_model_name, subfolder="tokenizer", revision=args.revision
     )
     text_encoder = CLIPTextModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision
+        args.pretrained_model_name, subfolder="text_encoder", revision=args.revision
     )
     vae = AutoencoderKL.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="vae", revision=args.revision, variant=args.variant
+        args.pretrained_model_name, subfolder="vae", revision=args.revision, variant=args.variant
     )
+    ckpt = '../../../SD/checkpoints/v2-1_768-ema-pruned.ckpt'
+    
+    ##First attempt that doesn't work as my unet does not have an argument add_adapter
+    config = "../../../SD/configs/stable-diffusion/v2-inference-v.yaml"
+    config = OmegaConf.load(f"{config}")
+    device = torch.device("cuda")
+    """
+    pl_sd = torch.load(ckpt, map_location="cuda")
+    sd = pl_sd["state_dict"]
+    model = instantiate_from_config(config.model)
+    model.load_state_dict(sd, strict=False)
+    model.cuda()
+    device = torch.device("cuda")
+    sampler = DDIMSampler(model, device=device)
+    unet = model.model.diffusion_model
+    """
+    #second attempt
+    #unet = UNet2DConditionModel.from_pretrained(
+    #    ckpt,config = config, revision=args.revision, variant=args.variant
+    #)
+    #third attempt 
     unet = UNet2DConditionModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision, variant=args.variant
+        "stabilityai/stable-diffusion-2-1", subfolder="unet", revision=args.revision, variant=args.variant
     )
+    #fourth attempt
+    #unet = AutoModelForKwargs.from_pretrained(
+    #    "stabilityai/stable-diffusion-2-1", subfolder="unet", revision=args.revision, variant=args.variant
+    #)
+
+
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
     vae.requires_grad_(False)
@@ -578,47 +605,22 @@ def main():
         weight_decay=args.adam_weight_decay,
         eps=args.adam_epsilon,
     )
+    #fourth
+    #scaler = GradScaler()
 
-    # Get the datasets: you can either provide your own training and evaluation files (see below)
-    # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
-
-    # In distributed training, the load_dataset function guarantees that only one local process can concurrently
-    # download the dataset.
-    
-    config = "../../../SD/configs/stable-diffusion/v2-inference-v.yaml"
-    config = OmegaConf.load(f"{config}")
-    device = torch.device("cuda")
-    ckpt = '../../../SD/checkpoints/v2-1_768-ema-pruned.ckpt'
-    pl_sd = torch.load(ckpt, map_location="cuda")
-    model = instantiate_from_config(config.model)
-    model.cuda()
-    device = torch.device("cuda")
-    sampler = DDIMSampler(model, device=device)
-    unet = model.model.diffusion_model
-
+    dataset = load_dataset("imagefolder", data_dir=args.data_path, drop_labels=False)
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.
-    column_names = dataset["train"].column_names
 
+
+    column_names = dataset["train"].column_names #['image', 'text']
+    image_column = column_names[0]
+    caption_column = column_names[-1]
+    images = dataset["train"][image_column]
+    #images = torch.unsqueeze(torch.tensor(images), dim=0)
+    prompts = dataset["train"][caption_column]
     # 6. Get the column names for input/target.
-    dataset_columns = DATASET_NAME_MAPPING.get(args.dataset_name, None)
-    if args.image_column is None:
-        image_column = dataset_columns[0] if dataset_columns is not None else column_names[0]
-    else:
-        image_column = args.image_column
-        if image_column not in column_names:
-            raise ValueError(
-                f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}"
-            )
-    if args.caption_column is None:
-        caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
-    else:
-        caption_column = args.caption_column
-        if caption_column not in column_names:
-            raise ValueError(
-                f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}"
-            )
-
+    
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
     def tokenize_captions(examples, is_train=True):
@@ -847,6 +849,7 @@ def main():
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
+
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
                 progress_bar.update(1)
@@ -854,7 +857,7 @@ def main():
                 accelerator.log({"train_loss": train_loss}, step=global_step)
                 train_loss = 0.0
 
-                if global_step % args.checkpointing_steps == 0:
+                if global_step % args.checkpointing_steps == 0 or global_step==51490 :
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
@@ -902,7 +905,7 @@ def main():
             if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
                 # create pipeline
                 pipeline = DiffusionPipeline.from_pretrained(
-                    args.pretrained_model_name_or_path,
+                    args.pretrained_model_name,
                     unet=unwrap_model(unet),
                     revision=args.revision,
                     variant=args.variant,
@@ -913,6 +916,8 @@ def main():
                 del pipeline
                 torch.cuda.empty_cache()
 
+
+    
     # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
@@ -930,7 +935,7 @@ def main():
         # Load previous pipeline
         if args.validation_prompt is not None:
             pipeline = DiffusionPipeline.from_pretrained(
-                args.pretrained_model_name_or_path,
+                args.pretrained_model_name,
                 revision=args.revision,
                 variant=args.variant,
                 torch_dtype=weight_dtype,
@@ -945,9 +950,9 @@ def main():
         if args.push_to_hub:
             save_model_card(
                 repo_id,
-                images=images,
-                base_model=args.pretrained_model_name_or_path,
-                dataset_name=args.dataset_name,
+                images=None,
+                base_model=args.pretrained_model_name,
+                dataset_name="remi349/finetuning_dataset_for_3D_training",
                 repo_folder=args.output_dir,
             )
             upload_folder(
@@ -956,7 +961,6 @@ def main():
                 commit_message="End of training",
                 ignore_patterns=["step_*", "epoch_*"],
             )
-
     accelerator.end_training()
 
 

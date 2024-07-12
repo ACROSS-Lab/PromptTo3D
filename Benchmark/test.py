@@ -102,7 +102,8 @@ def get_tfidf_cosine_scores(reference_prompt, generated_prompts):
 def screenshot_the_mesh(mesh, out_folder='./imagesout_01/', method=None, save_views=False):
     resolution = (512, 384)
     filename_format = "{:03d}.png"
-    scene = mesh.scene()
+    scene = trimesh.Scene()
+    scene.add_geometry(mesh)
     viewpoints = method() if method else []
     screenshots = []
 
@@ -128,7 +129,7 @@ def prompts_the_views(processor, model, screenshots):
         prompts.append(processor.decode(out[0], skip_special_tokens=True))
     return prompts
 
-def main(method, folder_mother, name, save_views): 
+def main(method, folder_mother, name, save_views, extension): 
     processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
     model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
     cwd = os.getcwd()
@@ -154,7 +155,7 @@ def main(method, folder_mother, name, save_views):
             continue
         
         folder_name = os.path.relpath(folder, cwd)
-        asset_path = os.path.join(folder_name, name + '.obj') if name else glob.glob(os.path.join(folder, "*.obj"))[0]
+        asset_path = os.path.join(folder_name, name + extension) if name else glob.glob(os.path.join(folder, "*."+extension))[0]
         mesh = trimesh.load(asset_path)
         screenshots = screenshot_the_mesh(mesh=mesh, out_folder=folder, method=method, save_views=save_views)
         generated_prompts = prompts_the_views(processor, model, screenshots)
@@ -192,6 +193,7 @@ if __name__ == "__main__":
     parser.add_argument("--folder_mother", type=str, default='./', help="Directory containing the 3D mesh files.")
     parser.add_argument("--name", type=str, help="Optional specific name of the .obj files to use.")
     parser.add_argument("--save_views", type=bool, default=False, help="Whether to save generated views of the model.")
+    parser.add_argument("--extension", type=str, default='.obj', help="extension of the 3D object generated")
     args = parser.parse_args()
 
     # Mapping string method names to function calls dynamically

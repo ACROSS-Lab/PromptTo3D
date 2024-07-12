@@ -163,3 +163,12 @@ triposr_copy/3D_benchmark
 output/
 tiposr_copy/output
 SD/train
+evaluate_pipelines
+
+
+
+#finetuning
+diffusers/examples/model
+diffusers/examples/modelsave
+diffusers/examples/sd_trained_3D_lora
+diffusers/examples/sd_trained_3D_lora
