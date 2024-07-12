@@ -1,17 +1,21 @@
 # Stable Diffusion text-to-image fine-tuning
 
-The `train_text_to_image.py` script shows how to fine-tune stable diffusion model on your own dataset.
+The `train_text_to_image_lora.py` permet de finetuner un modèle de stable diffusion sur son propre dataset
 
-___Note___:
-
-___This script is experimental. The script fine-tunes the whole model and often times the model overfits and runs into issues like catastrophic forgetting. It's recommended to try different hyperparameters to get the best result on your dataset.___
+Il faudra pour cela entraîner le modèle sur les deux cartes graphiques de l'ordinateur, étant donné que l'on vient déjà saturer les cartes graphques.
 
 
-## Running locally with PyTorch
-### Installing the dependencies
 
-Before running the scripts, make sure to install the library's training dependencies:
+## Partie création de l'environnement : 
+ Pour créer l'environnement, j'ai récupéré l'environnement du CRM que j'ai adapté (car la grosse difficulté est de trouver une version de xformers qui ne vient pas casser notre chaîne de dépendance...)
 
+
+
+## Créer son dataset
+
+Pour finetuner notre modèle et qu'il puisse générer des photos adéquates vis à vis de nos objectifs, générer des assets 3D. C'est pourquoi nous avons récupérer des photos d'objets venant d'objaverse, et dans un même dossier nous avons mis dans un même dossier train toutes nos images, et un fichier "metadata.csv". Ce fichier doit comprendre 2 colonnes, file_name (avec les nom des images) et text (avec les prompts associées aux images).
+
+retenez bien l'emplacement de ce dossier et rentrez le dans le flag
 **Important**
 
 To make sure you can successfully run the latest versions of the example scripts, we highly recommend **installing from source** and keeping the install up to date as we update the example scripts frequently and install some example-specific requirements. To do this, execute the following steps in a new virtual environment:

@@ -55,7 +55,7 @@ class ImageRater:
 
   def load_meshes(self, filename):
     mesh = trimesh.load(filename+'/model1.obj')
-    mesh2 = load(filename+'/model2.obj').texture(filename+'/model2.png')
+    mesh2 = vedo.load(filename+'/model2.obj').texture(filename+'/model2.png')
     return mesh, mesh2
 
 

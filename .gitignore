@@ -164,3 +164,12 @@ output/
 tiposr_copy/output
 SD/train
 Simplification_essai/data/model1.obj
+evaluate_pipelines
+
+
+
+#finetuning
+diffusers/examples/model
+diffusers/examples/modelsave
+diffusers/examples/sd_trained_3D_lora
+diffusers/examples/sd_trained_3D_lora

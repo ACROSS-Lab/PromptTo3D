@@ -54,7 +54,6 @@ def load_model_from_config(config, ckpt, device=torch.device("cuda"), verbose=Fa
     if len(u) > 0 and verbose:
         print("unexpected keys:")
         print(u)
-
     if device == torch.device("cuda"):
         model.cuda()
     elif device == torch.device("cpu"):
@@ -376,15 +375,15 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
     img.save(outdir+"preprocessed_image.png")
 
     crm_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="CRM.pth")
-    #specs = json.load(open("configs/specs_objaverse_total.json"))
-    specs = json.load(open("configs/23D.json"))
+    specs = json.load(open("configs/specs_objaverse_total.json"))
+    #specs = json.load(open("configs/23D.json"))
     model = CRM(specs).to("cuda")
     model.load_state_dict(torch.load(crm_path, map_location = "cuda"), strict=False)
 
-    #stage1_config = OmegaConf.load("configs/nf7_v3_SNR_rd_size_stroke.yaml").config
-    #stage2_config = OmegaConf.load("configs/stage2-v2-snr.yaml").config
-    stage1_config = OmegaConf.load("configs/i2is.yaml").config
-    stage2_config = OmegaConf.load("configs/is2ccm.yaml").config
+    stage1_config = OmegaConf.load("configs/nf7_v3_SNR_rd_size_stroke.yaml").config
+    stage2_config = OmegaConf.load("configs/stage2-v2-snr.yaml").config
+    #stage1_config = OmegaConf.load("configs/i2is.yaml").config
+    #stage2_config = OmegaConf.load("configs/is2ccm.yaml").config
     
     stage2_sampler_config = stage2_config.sampler
     stage1_sampler_config = stage1_config.sampler

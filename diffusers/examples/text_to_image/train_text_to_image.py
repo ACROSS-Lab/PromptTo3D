@@ -600,7 +600,6 @@ def main():
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
     unet.train()
-
     # Create EMA for the unet.
     if args.use_ema:
         ema_unet = UNet2DConditionModel.from_pretrained(
