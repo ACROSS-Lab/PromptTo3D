@@ -100,6 +100,20 @@ cd ../triposr_copy
 ```sh
 python MVDream_text_3D_gradio_app.py
 ```
+### You want to try our finetuned SD_Lora with TripoSR for 3D assets generation?
+
+## Add to the environment :
+```commandline
+pip install transformers==4.41.2
+pip install tokenizers==0.19.1
+pip install peft==0.11.1
+```
+### Local Gradio App for SD_finetune+TripOSR
+
+```sh
+python SD_finetune_triposr_gradio.py
+```
+
 
 
 ### Acknowledgement
