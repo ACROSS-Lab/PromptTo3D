@@ -163,6 +163,7 @@ triposr_copy/3D_benchmark
 output/
 tiposr_copy/output
 SD/train
+Simplification_essai/data/model1.obj
 evaluate_pipelines
 
 

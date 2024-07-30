@@ -134,6 +134,7 @@ gr.Interface(
     ],
     title="Text to Image and 3D Model Generation",
     description="Enter a text prompt to generate an image using Stable Diffusion and convert it into a 3D model."
+    
 ).launch(share=True)
 
 

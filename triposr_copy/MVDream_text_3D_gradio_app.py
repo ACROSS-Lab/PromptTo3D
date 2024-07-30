@@ -1,6 +1,8 @@
+################################################### THE IMPORTATIONS #############################################################
+
 import sys
 
-# Ajouter le chemin du dossier MVDream au système de chemins de Python
+# Ajout le chemin du dossier MVDream au système de chemins de Python
 sys.path.append('../MVDream')
 import random
 import argparse
@@ -19,11 +21,10 @@ from mvdream.model_zoo import build_model
 from PIL import Image
 import rembg
 import torch
-from PIL import Image
 from tsr.system import TSR
 from tsr.utils import remove_background, resize_foreground, save_video
 
-
+################################################### MVDREAM PART #########################################################
 
 def set_seed(seed):
     seed = int(seed) 
@@ -80,7 +81,7 @@ def generate_images(args, model, sampler, text_input, uncond_text_input, seed, g
                     camera=camera, num_frames=num_frames)
     return imgs_list[0]  # Return only the first image
 
-
+########################################## TRIPOSR PART ####################################################################
 def process_image(input_image_path, output_dir, device='cuda:0', pretrained_model='stabilityai/TripoSR', chunk_size=8192,
                   mc_resolution=256, remove_bg=True, foreground_ratio=0.85, model_save_format='obj', render=False):
     os.makedirs(output_dir, exist_ok=True)
@@ -132,6 +133,8 @@ def process_image(input_image_path, output_dir, device='cuda:0', pretrained_mode
 
     return output_mesh_path
 
+########################################## COMBINATION PART ##########################################################
+
 def generate_image_and_convert_to_3d(prompt, seed, guidance_scale, step, elevation, azimuth, use_camera):
     # Generate Image from prompt via stable diffusion
     image = generate_images(args, model, sampler, prompt, "", seed, guidance_scale, step, elevation, azimuth, use_camera)
@@ -180,8 +183,11 @@ if __name__ == "__main__":
 
     fn_with_model = partial(generate_images, args, model, sampler)
 
+
+
+######################################################## GRADIO ####################################################################
     with gr.Blocks() as demo:
-        gr.Markdown("MVDream and TripoSR demo for images and 3D generation from text and camera inputs.")
+        gr.Markdown("## MVDream and TripoSR demo for images and 3D generation from text and camera inputs.")
         with gr.Row():
             with gr.Column():
                 text_input = gr.Textbox(value="", label="Prompt")

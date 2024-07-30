@@ -70,7 +70,7 @@ This will save the reconstructed 3D model to `output/`. You can also specify mor
 
 ### Local Gradio App
 ```sh
-python test_gradio_triposr.py
+python SD_triposr_gradio.py
 ```
 
 ## Troubleshooting
