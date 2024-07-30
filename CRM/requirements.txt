@@ -28,3 +28,6 @@ kiui==0.2.8
 trimesh==4.3.1
 xatlas==0.0.9
 pymeshlab==2023.12.post1
+accelerate==0.33.0
+pyglet==1.5.29
+triton==2.3.0

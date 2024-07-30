@@ -7,7 +7,7 @@ import tempfile
 from mesh import Mesh
 import zipfile
 import trimesh
-def generate3d(model, rgb, ccm, device, object_name = 'tmp/temp'):
+def generate3d(model, rgb, ccm, device, object_name = './out/glb/object'):
 
     color_tri = torch.from_numpy(rgb)/255
     xyz_tri = torch.from_numpy(ccm[:,:,(2,1,0)])/255
@@ -88,4 +88,4 @@ def generate3d(model, rgb, ccm, device, object_name = 'tmp/temp'):
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"uv takes {elapsed_time}s")
-    return mesh_path_glb+".glb", mesh_path_obj+'.zip'
+    return object_name+".glb", mesh_path_obj+'.zip'

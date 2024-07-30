@@ -12,8 +12,6 @@ from pytorch_lightning import seed_everything
 from torch import autocast
 from contextlib import nullcontext
 from imwatermark import WatermarkEncoder
-
-
 import torch
 from PIL import Image
 from huggingface_hub import hf_hub_download
@@ -25,7 +23,12 @@ import os
 import xformers
 import xformers.ops
 
+from diffusers import StableDiffusionPipeline 
+pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
 
+# Then add the lora weights to the model stable diffusion 2
+pipe.unet.load_attn_procs('ACROSS-Lab/sd_finetuned')
+pipe.to("cuda")
 
 ##################### CRM PART ###############################################
 from libs.base_utils import do_resize_content
@@ -104,77 +107,96 @@ def preprocess_image(image, background_choice, foreground_ratio, backgroud_color
     image = add_background(image, backgroud_color)
     return image.convert("RGB")
 
-## implémenter la possiblilité d'avoir plusieurs images !!!!
-
-
-
-
-
-
-
-def CRM_own(inputdir,  object_name, scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "out/"):
+def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "out/" ):
    # bg_choice : "[Auto Remove background] or [Alpha as mask]",
+
     img = Image.open(inputdir)
     img = preprocess_image(img, bg_choice, 1.0, (127, 127, 127))
     os.makedirs(outdir, exist_ok=True)
     img.save(outdir+"preprocessed_image.png")
+
     crm_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="CRM.pth")
     specs = json.load(open("configs/specs_objaverse_total.json"))
+    #specs = json.load(open("configs/23D.json"))
     model = CRM(specs).to("cuda")
     model.load_state_dict(torch.load(crm_path, map_location = "cuda"), strict=False)
+
     stage1_config = OmegaConf.load("configs/nf7_v3_SNR_rd_size_stroke.yaml").config
     stage2_config = OmegaConf.load("configs/stage2-v2-snr.yaml").config
+    #stage1_config = OmegaConf.load("configs/i2is.yaml").config
+    #stage2_config = OmegaConf.load("configs/is2ccm.yaml").config
+    
     stage2_sampler_config = stage2_config.sampler
     stage1_sampler_config = stage1_config.sampler
+
     stage1_model_config = stage1_config.models
     stage2_model_config = stage2_config.models
+
     ##potentiellement il y a une nécessité de faire ça en cache en supprimant la partie local_dir ...
     xyz_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="ccm-diffusion.pth", local_dir = './models/')
     pixel_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="pixel-diffusion.pth", local_dir = './models/')
+
+    
     stage1_model_config.resume = pixel_path
     stage2_model_config.resume = xyz_path
+
     pipeline = TwoStagePipeline(
         stage1_model_config,
         stage2_model_config,
         stage1_sampler_config,
         stage2_sampler_config,
     )
+
+    
     #dictionnaire en sortie du model avec stage1_image et tout
     rt_dict = pipeline(img, scale=scale, step=step)
+    
     ###MV Images ###########################
     stage1_images = rt_dict["stage1_images"]
     np_imgs = np.concatenate(stage1_images, 1)
     Image.fromarray(np_imgs).save(outdir+"pixel_images.png")
+    
     ####### CCM Images #################
     stage2_images = rt_dict["stage2_images"]
     np_xyzs = np.concatenate(stage2_images, 1)
     Image.fromarray(np_xyzs).save(outdir+"xyz_images.png")
+
     ### Génération de l'asset 3D ####################
-    glb_path, obj_path = generate3d(model, np_imgs, np_xyzs, "cuda", object_name)
+    glb_path, obj_path = generate3d(model, np_imgs, np_xyzs, "cuda")
+    shutil.copy(obj_path, outdir+"output3d.zip")
     return glb_path
+##############################################################################
 
 
 
+#################### Gradio Part #############################################
+import gradio as gr
+
+
+def prompt_to_image2(prompt):
+    if prompt is None:
+        raise gr.Error("Veuillez rentrer un prompt svp")
+    prompt = prompt
+    image = pipe(prompt, num_inference_steps=30, guidance_scale=7.5).images[0]
+    out_path = "outputs/txt2img-samples/sdf.png"
+    image.save(out_path)
+    glb_path = CRM_own(out_path)
+    return image, glb_path
+
+with gr.Blocks() as demo:
+    with gr.Row():
+        with gr.Column():
+            prompt = gr.Textbox(label="Prompt", placeholder = "Entrez votre pompt ici (en anglais ;) ).")
+            generate_image_btn = gr.Button(value="asset 3D")
+        with gr.Column():
+            image_generee = gr.Image(label = "image 2D", image_mode = 'RGBA', sources = 'upload', type = 'pil', interactive = False)
+    with gr.Row():
+        output_obj = gr.Model3D(interactive = False, label = "Output 3D asset")
+    generate_image_btn.click(fn = prompt_to_image2, inputs = [prompt], outputs = [image_generee, output_obj])
+    examples = gr.Examples(examples=["a horse", "a hamburger", "a rabbit", "a man with a blue jacket"], inputs=[prompt])
+
+demo.launch(share=True)
 
 ##############################################################################
-def process_directory(input_dir, output_dir):
-    parent_dir_name = os.path.basename(input_dir)
-    os.makedirs(output_dir, exist_ok=True)
-    images = [f for f in os.listdir(input_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
-    for idx, image_name in enumerate(sorted(images), start=0):
-        input_image_path = os.path.join(input_dir, image_name)
-        sub_dir = os.path.join(output_dir, f"{idx:03d}")
-        os.makedirs(sub_dir, exist_ok=True)
-        output_mesh_path = os.path.join(output_dir, f"{idx:03d}/{idx:03d}_{parent_dir_name.upper()}_CRM")
-        print(output_mesh_path)
-        CRM_own(input_image_path, output_mesh_path)
-def main(input_folder, output_folder):
-    process_directory(input_folder, output_folder)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Générer des objets 3D à partir d\'images')
-    parser.add_argument("--input_folder", help="Dossier où sont stockées les images générées", default='../evaluate_pipelines/SD_images')
-    parser.add_argument("--output_folder", help="Dossier où seront exportées situées les meshs de nos objets 3D", default='../evaluate_pipelines/assets_3D', type=str)
-    args = parser.parse_args()
-    main(**vars(args))

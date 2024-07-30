@@ -1,8 +1,4 @@
-import argparse, os
 import cv2
-import torch
-import numpy as np
-from omegaconf import OmegaConf
 from PIL import Image
 from tqdm import tqdm, trange
 from itertools import islice
@@ -11,27 +7,29 @@ from torchvision.utils import make_grid
 from pytorch_lightning import seed_everything
 from torch import autocast
 from contextlib import nullcontext
-from imwatermark import WatermarkEncoder
-
-
 import torch
-from PIL import Image
 from huggingface_hub import hf_hub_download
 import json
 import shutil
 import PIL
 import rembg
-import os
 import xformers
 import xformers.ops
 
 
 
-########################## MV DREAM  PART #######################################
+
+
+import sys
+
+# Ajouter le chemin du dossier MVDream au système de chemins de Python
+sys.path.append('../MVDream')
 import random
 import argparse
 from functools import partial
 import numpy as np
+import gradio as gr
+import os
 from omegaconf import OmegaConf
 import torch 
 
@@ -41,7 +39,10 @@ from mvdream.ldm.models.diffusion.ddim import DDIMSampler
 from mvdream.model_zoo import build_model
 
 
+
+
 def set_seed(seed):
+    seed = int(seed) 
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -49,26 +50,26 @@ def set_seed(seed):
 
 
 def t2i(model, image_size, prompt, uc, sampler, step=20, scale=7.5, batch_size=8, ddim_eta=0., dtype=torch.float32, device="cuda", camera=None, num_frames=1):
-    if type(prompt)!=list:
+    if type(prompt) != list:
         prompt = [prompt]
     with torch.no_grad(), torch.autocast(device_type=device, dtype=dtype):
         c = model.get_learned_conditioning(prompt).to(device)
-        c_ = {"context": c.repeat(batch_size,1,1)}
-        uc_ = {"context": uc.repeat(batch_size,1,1)}
+        c_ = {"context": c.repeat(batch_size, 1, 1)}
+        uc_ = {"context": uc.repeat(batch_size, 1, 1)}
         if camera is not None:
             c_["camera"] = uc_["camera"] = camera
             c_["num_frames"] = uc_["num_frames"] = num_frames
 
         shape = [4, image_size // 8, image_size // 8]
         samples_ddim, _ = sampler.sample(S=step, conditioning=c_,
-                                        batch_size=batch_size, shape=shape,
-                                        verbose=False, 
-                                        unconditional_guidance_scale=scale,
-                                        unconditional_conditioning=uc_,
-                                        eta=ddim_eta, x_T=None)
+                                         batch_size=batch_size, shape=shape,
+                                         verbose=False,
+                                         unconditional_guidance_scale=scale,
+                                         unconditional_conditioning=uc_,
+                                         eta=ddim_eta, x_T=None)
         x_sample = model.decode_first_stage(samples_ddim)
         x_sample = torch.clamp((x_sample + 1.0) / 2.0, min=0.0, max=1.0)
-        x_sample = 255. * x_sample.permute(0,2,3,1).cpu().numpy()
+        x_sample = 255. * x_sample.permute(0, 2, 3, 1).cpu().numpy()
 
     return list(x_sample.astype(np.uint8))
 
@@ -80,28 +81,20 @@ def generate_images(args, model, sampler, text_input, uncond_text_input, seed, g
 
     if use_camera:
         camera = get_camera(args.num_frames, elevation=elevation, azimuth_start=azimuth)
-        camera = camera.repeat(batch_size//args.num_frames,1).to(device)
+        camera = camera.repeat(batch_size // args.num_frames, 1).to(device)
         num_frames = args.num_frames
     else:
         camera = None
         num_frames = 1
-    
+
     t = text_input + args.suffix
-    uc = model.get_learned_conditioning( [uncond_text_input] ).to(device)
+    uc = model.get_learned_conditioning([uncond_text_input]).to(device)
     set_seed(seed)
-    images = []
-    for _ in range(2):
-        img = t2i(model, args.size, t, uc, sampler, step=step, scale=guidance_scale, batch_size=batch_size, ddim_eta=0.0, 
-                dtype=dtype, device=device, camera=camera, num_frames=num_frames)
-        img = np.concatenate(img, 1)
-        images.append(img)
-    images = np.concatenate(images, 0)
-    return images
- 
-    
 
-##############################################################################
-
+    imgs_list = t2i(model, args.size, t, uc, sampler, step=step, scale=guidance_scale,
+                    batch_size=batch_size, ddim_eta=0.0, dtype=dtype, device=device,
+                    camera=camera, num_frames=num_frames)
+    return imgs_list[0]  # Return only the first image
 
 ##################### CRM PART ###############################################
 from libs.base_utils import do_resize_content
@@ -180,7 +173,6 @@ def preprocess_image(image, background_choice, foreground_ratio, backgroud_color
     image = add_background(image, backgroud_color)
     return image.convert("RGB")
 
-## implémenter la possiblilité d'avoir plusieurs images !!!!
 
 
 
@@ -188,7 +180,7 @@ def preprocess_image(image, background_choice, foreground_ratio, backgroud_color
 
 
 
-def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "out/" ):
+def CRM_own(inputdir, outdir, scale = 5.0, step = 50, bg_choice = "Auto Remove background" ):
 
    # bg_choice : "[Auto Remove background] or [Alpha as mask]",
 
@@ -199,11 +191,15 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
 
     crm_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="CRM.pth")
     specs = json.load(open("configs/specs_objaverse_total.json"))
+    #specs = json.load(open("configs/23D.json"))
     model = CRM(specs).to("cuda")
     model.load_state_dict(torch.load(crm_path, map_location = "cuda"), strict=False)
 
     stage1_config = OmegaConf.load("configs/nf7_v3_SNR_rd_size_stroke.yaml").config
     stage2_config = OmegaConf.load("configs/stage2-v2-snr.yaml").config
+    #stage1_config = OmegaConf.load("configs/i2is.yaml").config
+    #stage2_config = OmegaConf.load("configs/is2ccm.yaml").config
+    
     stage2_sampler_config = stage2_config.sampler
     stage1_sampler_config = stage1_config.sampler
 
@@ -249,62 +245,74 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
 
 
 
-#################### Gradio Part #############################################
-import gradio as gr
-PRE_PROMPT = ""
-POST_PROMPT = "3D"
+def generate_image_and_convert_to_3d(prompt, seed, guidance_scale, step, elevation, azimuth, use_camera):
+    # Generate Image from prompt via stable diffusion
+    image = generate_images(args, model, sampler, prompt, "", seed, guidance_scale, step, elevation, azimuth, use_camera)
 
-#PRE_PROMPT = "i want to create a 3D asset from this prompt by first generating an image, create a "
-#POST_PROMPT = "standing from far and isolated with lighting everywhere no sun"
-#PRE_PROMPT = "I want to create a 3D asset from this prompt by first generating an image, create"
-#POST_PROMPT = "full, whole and complete, standing from very far and isolated with lighting everywhere, and a solid background please"
-def prompt_to_image(prompt):
-    if prompt is None:
-        raise gr.Error("Veuillez rentrer un prompt svp")
-    prompt = PRE_PROMPT + prompt + POST_PROMPT
-    stable_diffusion_t2i(prompt = prompt)
-    #do resize content ? expand to square ?
-    out_path = "outputs/txt2img-samples/samples"
-    grid_count = len(os.listdir(out_path)) - 1
-    out_path = out_path + f"/{grid_count:05}.png"
-    img = Image.open(out_path)
-    return img
+    # Save the generated image
+    image_path = "outputs/txt2img-samples/samples/output.png"
+    os.makedirs(image_path[:-11], exist_ok=True)
+    Image.fromarray(image).save(image_path)
+    model_3d_path = CRM_own(image_path, "./outputs")
 
-def prompt_to_image2(prompt):
-    if prompt is None:
-        raise gr.Error("Veuillez rentrer un prompt svp")
-    prompt = prompt + POST_PROMPT
-    stable_diffusion_t2i(prompt = prompt)
-    #do resize content ? expand to square ?
-    out_path = "outputs/txt2img-samples/samples"
-    grid_count = len(os.listdir(out_path)) - 1
-    out_path = out_path + f"/{grid_count:05}.png"
-    img = Image.open(out_path)
+    Image.fromarray(image).save(image_path)
 
-    glb_path = CRM_own(out_path)
-
-
-    return img, glb_path
-
-
-with gr.Blocks() as demo:
-    with gr.Row():
-        with gr.Column():
-            prompt = gr.Textbox(label="Prompt", placeholder = "Entrez votre pompt ici (en anglais ;) ).")
-            generate_image_btn = gr.Button(value="asset 3D")
-
-
-        with gr.Column():
-            image_generee = gr.Image(label = "image 2D", image_mode = 'RGBA', sources = 'upload', type = 'pil', interactive = False)
-    with gr.Row():
-        output_obj = gr.Model3D(interactive = False, label = "Output 3D asset")
-    generate_image_btn.click(fn = prompt_to_image2, inputs = [prompt], outputs = [image_generee, output_obj])
-    examples = gr.Examples(examples=["a horse", "a hamburger", "a rabbit", "a man with a blue jacket"], inputs=[prompt])
+    return image_path, model_3d_path, model_3d_path  # Return image path, model path for visualization, and model path for download
 
 
 
-demo.launch(share=True)
+if __name__ == "__main__":
 
-##############################################################################
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_name", type=str, default="sd-v2.1-base-4view", help="load pre-trained model from hugginface")
+    parser.add_argument("--config_path", type=str, default=None, help="load model from local config (override model_name)")
+    parser.add_argument("--ckpt_path", type=str, default=None, help="path to local checkpoint")
+    parser.add_argument("--suffix", type=str, default=", 3d asset")
+    parser.add_argument("--num_frames", type=int, default=4)
+    parser.add_argument("--size", type=int, default=256)
+    parser.add_argument("--fp16", action="store_true")
+    parser.add_argument("--device", type=str, default='cuda')
+    args = parser.parse_args()
 
+    print("load t2i model ... ")
+    if args.config_path is None:
+        model = build_model(args.model_name, ckpt_path=args.ckpt_path)
+    else:
+        assert args.ckpt_path is not None, "ckpt_path must be specified!"
+        config = OmegaConf.load(args.config_path)
+        model = instantiate_from_config(config.model)
+        model.load_state_dict(torch.load(args.ckpt_path, map_location='cpu'))
+    model.device = args.device
+    model.to(args.device)
+    model.eval()
 
+    sampler = DDIMSampler(model)
+    print("load t2i model done . ")
+
+    fn_with_model = partial(generate_images, args, model, sampler)
+
+    with gr.Blocks() as demo:
+        gr.Markdown("MVDream and TripoSR demo for images and 3D generation from text and camera inputs.")
+        with gr.Row():
+            with gr.Column():
+                text_input = gr.Textbox(value="", label="Prompt")
+                uncond_text_input = gr.Textbox(value="", label="Negative prompt")
+                seed = gr.Number(value=23, label="Seed", precision=0)
+                guidance_scale = gr.Number(value=7.5, label="Guidance scale")
+                step = gr.Number(value=25, label="Sample steps", precision=0)
+                elevation = gr.Slider(0, 30, value=15, label="Elevation")
+                azimuth = gr.Slider(0, 360, value=0, label="Azimuth")
+                use_camera = gr.Checkbox(value=True, label="Multi-view Mode")
+                generate_button = gr.Button("Generate Images and Convert to 3D")
+            
+            image_output = gr.Image(label="Generated Image")  # Create a single image component for generated image
+            model_output = gr.Model3D(label="3D Model")  # Create a file visualization component for the 3D model
+            download_output = gr.File(label="Download OBJ")  # Create a file component for downloading the 3D model
+
+            
+
+        inputs = [text_input, seed, guidance_scale, step, elevation, azimuth, use_camera]
+        outputs = [image_output, model_output, download_output]
+        generate_button.click(generate_image_and_convert_to_3d, inputs=inputs, outputs=outputs)
+
+    demo.launch(share=True)
