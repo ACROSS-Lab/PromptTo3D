@@ -31,3 +31,7 @@ pymeshlab==2023.12.post1
 accelerate==0.33.0
 pyglet==1.5.29
 triton==2.3.0
+pyautogui==0.9.54
+vedo==2024.5.2
+sentence_transformers==3.0.1
+nltk==3.8.1

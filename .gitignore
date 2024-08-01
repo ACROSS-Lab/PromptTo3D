@@ -169,7 +169,6 @@ evaluate_pipelines
 
 
 #finetuning
-diffusers/examples/model
-diffusers/examples/modelsave
-diffusers/examples/sd_trained_3D_lora
-diffusers/examples/sd_trained_3D_lora
+SD/diffusers/examples/text_to_image/model
+SD/diffusers/examples/text_to_image/mode
+SD/diffusers/examples/text_to_image/sd_trained_3D_lora
