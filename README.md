@@ -48,6 +48,7 @@ it is supposed to return true, otherwise there is an issue that needs to be fixe
 Congrats, you can now clone this project if that's not already done
 ```
 git clone https://github.com/ACROSS-Lab/PromptTo3D.git
+cd PromptTo3D
 ```
 Please install the requirements along with NVDiffrast library and xformers library (be carefull to really use the following installation link, it's the only one that works with this environment...)
 ```
