@@ -24,6 +24,8 @@ import shutil
 from contextlib import nullcontext
 from pathlib import Path
 
+import sys
+
 import datasets
 import numpy as np
 import torch
@@ -46,7 +48,6 @@ from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
 import xformers
 import xformers.ops
-from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.dpm_solver import DPMSolverSampler
