@@ -18,7 +18,7 @@ Built on Wed_Jun__8_16:49:14_PDT_2022
 Cuda compilation tools, release 11.7, V11.7.99
 Build cuda_11.7.r11.7/compiler.31442593_0
 ```
-otherwise, if you don't have this version installed, please install it following the instructions on [this page](https://developer.nvidia.com/cuda-11-7-0-download-archive), and make sure to have installed a cuda toolkit too, that the PATH is well defined to the right cuda version and that the variable CUDA_HOME points to the right cuda version too. Try once again the nvcc --version command.
+otherwise, if you don't have this version installed, please install it following the instructions on [this page](https://developer.nvidia.com/cuda-11-7-0-download-archive), and make sure to have installed a cuda toolkit too, that the PATH is well defined to the right cuda version and that the variable CUDA_HOME points to the right cuda version too (⚠⚠⚠ make sure this path is correct and exists). Try once again the nvcc --version command.
 
 Then you should create a conda environment with python version 3.9.19 with a command such as
 ```

@@ -22,7 +22,7 @@ import rembg
 import os
 import xformers
 import xformers.ops
-
+sys.path.append('../CRM')
 from diffusers import StableDiffusionPipeline 
 pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
 
@@ -107,7 +107,7 @@ def preprocess_image(image, background_choice, foreground_ratio, backgroud_color
     image = add_background(image, backgroud_color)
     return image.convert("RGB")
 
-def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "out/" ):
+def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "../CRM/out/" ):
    # bg_choice : "[Auto Remove background] or [Alpha as mask]",
 
     img = Image.open(inputdir)
@@ -116,13 +116,13 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
     img.save(outdir+"preprocessed_image.png")
 
     crm_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="CRM.pth")
-    specs = json.load(open("configs/specs_objaverse_total.json"))
+    specs = json.load(open("../CRM/configs/specs_objaverse_total.json"))
     #specs = json.load(open("configs/23D.json"))
     model = CRM(specs).to("cuda")
     model.load_state_dict(torch.load(crm_path, map_location = "cuda"), strict=False)
 
-    stage1_config = OmegaConf.load("configs/nf7_v3_SNR_rd_size_stroke.yaml").config
-    stage2_config = OmegaConf.load("configs/stage2-v2-snr.yaml").config
+    stage1_config = OmegaConf.load("../CRM/configs/nf7_v3_SNR_rd_size_stroke.yaml").config
+    stage2_config = OmegaConf.load("../CRM/configs/stage2-v2-snr.yaml").config
     #stage1_config = OmegaConf.load("configs/i2is.yaml").config
     #stage2_config = OmegaConf.load("configs/is2ccm.yaml").config
     
@@ -133,8 +133,8 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
     stage2_model_config = stage2_config.models
 
     ##potentiellement il y a une nécessité de faire ça en cache en supprimant la partie local_dir ...
-    xyz_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="ccm-diffusion.pth", local_dir = './models/')
-    pixel_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="pixel-diffusion.pth", local_dir = './models/')
+    xyz_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="ccm-diffusion.pth", local_dir = '../CRM/models/')
+    pixel_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="pixel-diffusion.pth", local_dir = '../CRM/models/')
 
     
     stage1_model_config.resume = pixel_path

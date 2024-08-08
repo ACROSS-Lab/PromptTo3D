@@ -32,6 +32,7 @@ from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.dpm_solver import DPMSolverSampler
 
 torch.set_grad_enabled(False)
+sys.path.append('../CRM')
 
 def chunk(it, size):
     it = iter(it)
@@ -362,7 +363,7 @@ def preprocess_image(image, background_choice, foreground_ratio, backgroud_color
 
 
 
-def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "out/" ):
+def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove background", outdir = "../CRM/out/" ):
 
    # bg_choice : "[Auto Remove background] or [Alpha as mask]",
 
@@ -372,13 +373,13 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
     img.save(outdir+"preprocessed_image.png")
 
     crm_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="CRM.pth")
-    specs = json.load(open("configs/specs_objaverse_total.json"))
+    specs = json.load(open("../CRM/configs/specs_objaverse_total.json"))
     #specs = json.load(open("configs/23D.json"))
     model = CRM(specs).to("cuda")
     model.load_state_dict(torch.load(crm_path, map_location = "cuda"), strict=False)
 
-    stage1_config = OmegaConf.load("configs/nf7_v3_SNR_rd_size_stroke.yaml").config
-    stage2_config = OmegaConf.load("configs/stage2-v2-snr.yaml").config
+    stage1_config = OmegaConf.load("../CRM/configs/nf7_v3_SNR_rd_size_stroke.yaml").config
+    stage2_config = OmegaConf.load("../CRM/configs/stage2-v2-snr.yaml").config
     #stage1_config = OmegaConf.load("configs/i2is.yaml").config
     #stage2_config = OmegaConf.load("configs/is2ccm.yaml").config
     
@@ -389,8 +390,8 @@ def CRM_own(inputdir,  scale = 5.0, step = 50, bg_choice = "Auto Remove backgrou
     stage2_model_config = stage2_config.models
 
     ##potentiellement il y a une nécessité de faire ça en cache en supprimant la partie local_dir ...
-    xyz_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="ccm-diffusion.pth", local_dir = './models/')
-    pixel_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="pixel-diffusion.pth", local_dir = './models/')
+    xyz_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="ccm-diffusion.pth", local_dir = '../CRM/models/')
+    pixel_path = hf_hub_download(repo_id="Zhengyi/CRM", filename="pixel-diffusion.pth", local_dir = '../CRM/models/')
 
     
     stage1_model_config.resume = pixel_path
@@ -436,13 +437,15 @@ POST_PROMPT = ", 3D"
 #POST_PROMPT = "standing from far and isolated with lighting everywhere no sun"
 #PRE_PROMPT = "I want to create a 3D asset from this prompt by first generating an image, create"
 #POST_PROMPT = "full, whole and complete, standing from very far and isolated with lighting everywhere, and a solid background please"
+
+
 def prompt_to_3D(prompt):
     if prompt is None:
         raise gr.Error("Veuillez rentrer un prompt svp")
     prompt = prompt + POST_PROMPT
     stable_diffusion_t2i(prompt = prompt)
     #do resize content ? expand to square ?
-    out_path = "outputs/txt2img-samples/samples"
+    out_path = "../CRM/outputs/txt2img-samples/samples"
     grid_count = len(os.listdir(out_path)) - 1
     out_path = out_path + f"/{grid_count:05}.png"
     img = Image.open(out_path)
