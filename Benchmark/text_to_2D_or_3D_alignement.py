@@ -14,7 +14,6 @@ import csv
 import matplotlib.pyplot as plt
 import tkinter as tk
 from PIL import Image, ImageTk
-#from tkinter import simpledialog
 
 
 # Setup and configuration for the execution environment

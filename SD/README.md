@@ -1,9 +1,6 @@
 # Stable Diffusion Version 2
-![t2i](assets/stable-samples/txt2img/768/merged-0006.png)
-![t2i](assets/stable-samples/txt2img/768/merged-0002.png)
-![t2i](assets/stable-samples/txt2img/768/merged-0005.png)
 
-This repository contains [Stable Diffusion](https://github.com/CompVis/stable-diffusion) models trained from scratch and will be continuously updated with
+This repository contains [Stable Diffusion](https://github.com/CompVis/stable-diffusion) and [diffusers](https://github.com/huggingface/diffusers). models trained from scratch and will be continuously updated with
 new checkpoints. The following list provides an overview of all currently available models. More coming soon.
 
 ## News
@@ -285,18 +282,5 @@ Thanks for open-sourcing!
 The code in this repository is released under the MIT License.
 
 The weights are available via [the StabilityAI organization at Hugging Face](https://huggingface.co/StabilityAI), and released under the [CreativeML Open RAIL++-M License](LICENSE-MODEL) License.
-
-## BibTeX
-
-```
-@misc{rombach2021highresolution,
-      title={High-Resolution Image Synthesis with Latent Diffusion Models}, 
-      author={Robin Rombach and Andreas Blattmann and Dominik Lorenz and Patrick Esser and Björn Ommer},
-      year={2021},
-      eprint={2112.10752},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
-}
-```
 
 

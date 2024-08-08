@@ -174,7 +174,7 @@ def main(input_folder, output_folder):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Générer des objets 3D à partir d\'images')
-    parser.add_argument("--input_folder", help="Dossier où sont stockées les images générées", default='../evaluate_pipelines/MVDREAM_images')
+    parser.add_argument("--input_folder", help="Dossier où sont stockées les images générées", default='../evaluate_pipelines/SD_images')
     parser.add_argument("--output_folder", help="Dossier où seront exportées situées les meshs de nos objets 3D", default='../evaluate_pipelines/assets_3D', type=str)
     args = parser.parse_args()
     main(**vars(args))
