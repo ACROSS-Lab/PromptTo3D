@@ -72,8 +72,7 @@ if is_wandb_available():
 check_min_version("0.30.0.dev0")
 
 logger = get_logger(__name__, log_level="INFO")
-
-
+os.environ['MODEL_NAME'] = "stabilityai/stable-diffusion-2-1"
 def save_model_card(
     repo_id: str,
     images: list = None,
@@ -406,13 +405,22 @@ def parse_args():
         help=("The dimension of the LoRA update matrices."),
     )
     parser.add_argument(
-        "--data_path",
+        "--hg_path",
         type=str,
-        default="../../../SD/train",
+        default=None,
+        help=(
+            "chemin vers où enregistrer le modele finetuné"
+        ),
+    )
+        parser.add_argument(
+        "--dataset",
+        type=str,
+        default="ACROSS-Lab/PromptTo3D_sd_dataset",
         help=(
             "chemin vers les données stockées en local pour finetuner Stable Diffusion"
         ),
     )
+
     
 
     args = parser.parse_args()
@@ -425,9 +433,6 @@ def parse_args():
     return args
 
 
-DATASET_NAME_MAPPING = {
-    "lambdalabs/naruto-blip-captions": ("image", "text"),
-}
 
 
 def main():
@@ -609,17 +614,17 @@ def main():
     #fourth
     #scaler = GradScaler()
 
-    dataset = load_dataset("imagefolder", data_dir=args.data_path, drop_labels=False)
+    dataset = load_dataset(args.dataset_name,split = 'train')
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.
 
 
-    column_names = dataset["train"].column_names #['image', 'text']
+    column_names = dataset.column_names #['image', 'text']
     image_column = column_names[0]
     caption_column = column_names[-1]
-    images = dataset["train"][image_column]
+    images = dataset[image_column]
     #images = torch.unsqueeze(torch.tensor(images), dim=0)
-    prompts = dataset["train"][caption_column]
+    prompts = dataset[caption_column]
     # 6. Get the column names for input/target.
     
     # Preprocessing the datasets.
@@ -953,7 +958,7 @@ def main():
                 repo_id,
                 images=None,
                 base_model=args.pretrained_model_name,
-                dataset_name="remi349/finetuning_dataset_for_3D_training",
+                dataset_name=args.hg_path,
                 repo_folder=args.output_dir,
             )
             upload_folder(

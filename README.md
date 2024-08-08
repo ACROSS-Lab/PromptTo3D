@@ -81,6 +81,13 @@ sudo apt update
 sudo apt install xvfb
 ```
 
+
+Now you can try our gradio interfaces located in the file scripts by doing for example :
+```
+cd scripts
+python SD_CRM.py
+```
+
 ### Acknowledgement
  [CRM](https://github.com/thu-ml/CRM) [CRM-finetuned](https://github.com/SanketDhuri/crm_3d_training) 
  [Diffusers](https://github.com/huggingface/diffusers) [MVDream](https://github.com/bytedance/MVDream)
