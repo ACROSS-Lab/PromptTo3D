@@ -1,3 +1,8 @@
+"""
+Script that transforms an asset into a gif
+the gif will be saved at out_path
+
+"""
 import subprocess
 import trimesh
 import numpy as np
@@ -11,13 +16,11 @@ from tqdm import tqdm
 import argparse
 import cv2
 import os
+import shutil
 
 def start_xvfb():
     cmd = "Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &"
-    subprocess.Popen(cmd, shell=True)
-
-def path_to_gif(path):
-    
+    subprocess.Popen(cmd, shell=True) 
 
 def sliced(n_iter = 100):
     """
@@ -45,17 +48,6 @@ def screenshot_the_mesh(mesh, out_folder, save_views = True):
     resolution=(512, 384)
     filename_format="{:03d}.png"
     #the fact to create a Trimesh Scene allows us to load .glb meshes nd .obj meshes
-    """
-    renderer = pyrender.OffscreenRenderer(viewport_width=resolution[0], viewport_height=resolution[1])
-
-    # Convert trimesh mesh to pyrender mesh format (optional)
-    pymesh = pyrender.Mesh.from_trimesh(mesh)
-
-    scene = pyrender.Scene()
-    scene.add(pymesh)
-    scene.add(pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], direction=[0.0, -1.0, 1.0]))
-    #scene.set_camera(camera_transform)
-    """
     scene = trimesh.Scene()
     scene.add_geometry(mesh)
     viewpoints = sliced()
@@ -83,3 +75,50 @@ def screenshot_the_mesh(mesh, out_folder, save_views = True):
         except ZeroDivisionError:
             print("Error: Window resizing caused division by zero. Try setting minimum window size or handling resizing events.")
     return screenshots
+
+def main(path_mesh, save_views, out_path):
+    """
+    This main scripts creates many gifs from the .obj file saved at location folder_mother
+    @param folder_mother : str, where the images are saved
+    @save_views : Bool, save or not the images (here we always save them)
+    """
+    #need to have downloaded xvfb
+    start_xvfb()
+    os.environ['DISPLAY'] = ':99'
+    os.environ['LC_ALL'] = 'C'
+    cwd = getcwd()
+    folder_mother = path.relpath(folder_mother, cwd)
+    mesh = trimesh.load(asset_path)
+    screenshots = screenshot_the_mesh(mesh = mesh, out_folder = "./tmp/", save_views = save_views)
+    filenames = [f"./tmp/{i:03d}.png" for i in range (100)]
+    with contextlib.ExitStack() as stack:
+        # lazily load images
+        imgs = (stack.enter_context(Image.open(f)) for f in filenames)
+        img = next(imgs)
+        img.save(fp=out_path, format='GIF', append_images=imgs, save_all=True, duration=40, loop=0)
+    #then remove all the images created
+    shutil.rmtree('./tmp')
+    print(f"Your gif has been saved at the location you provided {out_path}")
+
+if __name__== "__main__" :
+    parser = argparse.ArgumentParser(description = 'Transform a 3D mesh into a gif')
+    parser.add_argument(
+        "--path_mesh",
+        help = "path of the 3D mesh",
+        default = './mesh.obj',
+        type = str
+    )
+    parser.add_argument(
+        "--save_views",
+        default = True,
+        type = bool,
+        help = "boolean that decides if we save the screenshots taken, for now the script only works if we download the views"
+    )
+    parser.add_argument(
+        "--out_path",
+        default = "./mesh.gif",
+        type = str,
+        help = "path of the gif to save"
+    )
+    args = parser.parse_args()
+    main(**vars(args))

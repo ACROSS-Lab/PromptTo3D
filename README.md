@@ -74,6 +74,13 @@ pip install -e . --no-deps
 ```
 Congrats, now you can go in each of the CRM and Triposr folder to execute the right script to generate your assets.
 
+For the part about GIF generation from 3D assets, we decided to use a virtual framebuffer, in order for the code to be able to run on displayless devices, such as the server we used... Thus you need to install xvfb fo rthat part, you can do so by running the following : 
+
+```
+sudo apt update
+sudo apt install xvfb
+```
+
 ### Acknowledgement
  [CRM](https://github.com/thu-ml/CRM) [CRM-finetuned](https://github.com/SanketDhuri/crm_3d_training) 
  [Diffusers](https://github.com/huggingface/diffusers) [MVDream](https://github.com/bytedance/MVDream)

@@ -1,3 +1,7 @@
+"""
+Script that allow to generate many 3D objects from an image folder using CRM model
+"""
+
 import argparse, os
 import cv2
 import torch
