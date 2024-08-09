@@ -89,7 +89,7 @@ python SD_CRM.py
 ```
 
 ### Acknowledgement
- [CRM](https://github.com/thu-ml/CRM) [CRM-finetuned](https://github.com/SanketDhuri/crm_3d_training) 
- [Diffusers](https://github.com/huggingface/diffusers) [MVDream](https://github.com/bytedance/MVDream)
- [Stable Diffusion](https://github.com/CompVis/stable-diffusion) [T3Bench] (https://github.com/THU-LYJ-Lab/T3Bench)
- [Triposr] (https://github.com/VAST-AI-Research/TripoSR) 
+ [CRM](https://github.com/thu-ml/CRM); [CRM-finetuned](https://github.com/SanketDhuri/crm_3d_training) ;
+ [Diffusers](https://github.com/huggingface/diffusers) ;[MVDream](https://github.com/bytedance/MVDream);
+ [Stable Diffusion](https://github.com/CompVis/stable-diffusion) ;[T3Bench](https://github.com/THU-LYJ-Lab/T3Bench) and 
+ [Triposr](https://github.com/VAST-AI-Research/TripoSR) 
