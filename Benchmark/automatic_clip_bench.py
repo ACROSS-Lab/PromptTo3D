@@ -110,9 +110,9 @@ def main(data_folder, prompts_file):
     prompts = []
     with open(prompts_file, 'r') as file:
         prompts = [line.strip() for line in file.readlines()]
-    # chargement du modèle CLIP
+    # load the clip model
     clip_model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', pretrained='openai')
-    clip_model = clip_model.to(device)  # deplacement sur le GPU
+    clip_model = clip_model.to(device)  # move to the gpu
     clip_model.eval()
     tokenizer = open_clip.get_tokenizer('ViT-B-16')
     similarity_model = Similarity(clip_model, tokenizer, preprocess) 
@@ -120,7 +120,8 @@ def main(data_folder, prompts_file):
     results = []
     folders = sorted(glob(path.join(data_folder, '[0-9]*')))
 
-    # Gestion des erreurs entre incompatibilites du nombre de sous-dossiers et du nombre de prompts
+    # Error handling between incompatible number of subfolders and number of prompts
+    
     if len(folders)==len(prompts):
             print("everything is ok")
     elif len(folders)<len(prompts):
@@ -130,7 +131,7 @@ def main(data_folder, prompts_file):
         print("Error: Number of prompts must match the number of folders.")
         exit()
     
-    # Traitement des sous-dossiers et des prompts
+    # Processing subfolders and prompts
     for folder, prompt in tqdm(zip(folders, prompts), total=len(folders)):
         
         print("processing folder", folder, "with prompt", prompt)
